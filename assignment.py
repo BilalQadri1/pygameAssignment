@@ -58,11 +58,12 @@ pygame.init()
 windowWidth = 1280
 windowHeight = 720
 screen = pygame.display.set_mode((windowWidth, windowHeight))
-clock = pygame.time.Clock()  #will allow us to set framerate
+clock = pygame.time.Clock()  
 bahrainTrack = pygame.transform.scale(pygame.image.load("bahrain.png"), (12800,7200))
 bahrainMinimap = pygame.transform.scale(pygame.image.load("BahrainMinimap.png"), (256,144))
 
 menu = pygame.transform.scale(pygame.image.load("menu.png"), (1280,720))
+stats = pygame.image.load("board.png")
 
 car = pygame.image.load("ferrari.png")
 
@@ -154,6 +155,8 @@ carSound = pygame.mixer.Sound(os.path.join("engine.mp3"))
 carSound.set_volume(0)
 carSound.play(-1)
 
+flag = "none"
+ii = 0
 # *********GAME LOOP**********
 while True:
     time += clock.get_time() / 1000
@@ -161,16 +164,18 @@ while True:
     keys = pygame.key.get_pressed()
 
     # *********EVENTS**********
-    ev = pygame.event.poll()    # Look for any event
-    if ev.type == pygame.QUIT:  # windowow close button clicked?
-        break                   #   ... leave game loop
+    ev = pygame.event.poll()    
+    if ev.type == pygame.QUIT: 
+        break                   
     if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
             mouseX, mouseY = pygame.mouse.get_pos()
             if gamestate == "main":
                 if 300 < mouseX < 940 and 270 < mouseY < 370:
                     gamestate = "start"
                     lightSound.play()
-                    print("sound")
+            if gamestate == "stats":
+                if 520 < mouseX < 1160 and 500 < mouseY < 600:
+                    gamestate = "main"
 
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
@@ -199,10 +204,8 @@ while True:
             else:
                 DRS = False   
                
-    #PUT YOUR MOUSE/KEYBOARD EVENTS HERE
     
     if gamestate == "start":
-        # *********GAME LOGIC**********
         screen.blit(bahrainTrack, (trackX,trackY))
 
         #Reference #2
@@ -214,6 +217,7 @@ while True:
         #End Reference #2
 
         frontColor = screen.get_at((640, 360))
+        
         if frontColor == (127,127,127):
             if DRS:
                 FLTW = 0
@@ -225,7 +229,7 @@ while True:
                 FLTW -= 10
                 FRTW -= 10
             speed = -5
-
+        
         centerColor = screen.get_at((640, 360))
         if centerColor.r == 2 and centerColor.g == 96 and centerColor.b == 0:
             pendingPenalty = True
@@ -244,7 +248,7 @@ while True:
         if lightsOut and speed > 0:
             if keys[pygame.K_a]:
                 angle+=3
-                FLTW -= 0.01
+                FLTW -= 0.001
             if keys[pygame.K_d]:
                 angle-=3
                 FRTW -= 0.01
@@ -304,15 +308,23 @@ while True:
                 speed += 0.1
             if RRTW >= 0 and RLTW >= 0:
                 if DRS:
-                    RLTW -= 0.02
-                    RRTW -= 0.02
-                else:
                     RLTW -= 0.01
                     RRTW -= 0.01
+                else:
+                    RLTW -= 0.005
+                    RRTW -= 0.005
         else:
             if speed > 0:
                 speed -= 0.1
-        
+        if lightsOut:
+            if 20*speed < 150:
+                ii += 0.5
+                if ii >= 90:
+                    flag = "yellow"
+                    ii = 0
+            else:
+                flag = "none"
+                ii = 0
         if tyresintact and lightsOut:
             if DRS:
                 if keys[pygame.K_w] and speed < maxSpeed +5:
@@ -362,6 +374,9 @@ while True:
                     screen.blit(f1font2.render(("lap 2: " +str(lap2time)), True, (85, 26, 139)) , (1050, 50))
                 else:
                     screen.blit(f1font2.render(("lap 3: " +str(lap3time)), True, (85, 26, 139)) , (1050, 80))
+
+        if lap > 3:
+            gamestate = "stats"
 
         if TimePenalty > 0:
             screen.blit(f1font2.render(("penalty: " + str(TimePenalty)), True, ("white")) , (1050, 250))
@@ -441,7 +456,6 @@ while True:
             lights = 100
 
         carSound.set_volume(speed / maxSpeed * 0.5)
-        print(angle)
 
         minimapX = trackX / -50 + 25
         minimapY = trackY / -50 + 560
@@ -470,6 +484,18 @@ while True:
         screen.blit(f1font.render('Settings', True, ("black")) , (440, 450)) 
         screen.blit(f1font.render('Race', True, ("black")) , (520, 290))
 
+    elif gamestate == "stats":
+        screen.blit(stats, (0,0))
+        screen.blit(pygame.transform.scale(pygame.transform.rotate(car, -90), (206, 304)), (130,200))
+        screen.blit(f1font.render((str(lap1time)) + "s", True, ("black")) , (800, 205))
+        screen.blit(f1font.render((str(lap2time)) + "s", True, ("black")) , (800, 315))
+        screen.blit(f1font.render((str(lap3time)) + "s", True, ("black")) , (800, 425))
+        if 520 < mouseX < 1160 and 500 < mouseY < 600:
+            pygame.draw.rect(screen, ("white"),  (520, 500, 640, 100),0,30)
+        else:
+            pygame.draw.rect(screen, ("light grey"), (520, 500, 640, 100),0,30)
+        screen.blit(f1font.render('Main Menu', True, ("dark grey")) , (640, 520))
+    print(ii,flag,speed)
     pygame.display.flip()
     clock.tick(60)
 
