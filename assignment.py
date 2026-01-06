@@ -8,7 +8,6 @@ References:
 
 (put a link to your reference here but also add a comment in the code below where you used the reference)
 reference #1 to move forward in the direction the car is facing: https://stackoverflow.com/questions/64774900/how-to-get-velocity-x-and-y-from-angle-and-speed
-reference #2 to find a point by the front wing to track if the car hits the wall: https://stackoverflow.com/questions/75268174/pygame-maintain-a-points-position-around-a-rotated-image?utm_source=chatgpt.com
 -----------------------------------------------------------------------------
 
 Additional Libraries/Extensions:
@@ -61,7 +60,10 @@ screen = pygame.display.set_mode((windowWidth, windowHeight))
 clock = pygame.time.Clock()  
 bahrainTrack = pygame.transform.scale(pygame.image.load("bahrain.png"), (12800,7200))
 bahrainMinimap = pygame.transform.scale(pygame.image.load("BahrainMinimap.png"), (256,144))
+silverstoneTrack = pygame.transform.scale(pygame.image.load("silverstone.png"), (12800,7200))
+silverstoneMinimap = pygame.transform.scale(pygame.image.load("silverstoneMinimap.png"), (256,144))
 
+CurrentTrack = bahrainTrack
 menu = pygame.transform.scale(pygame.image.load("menu.png"), (1280,720))
 stats = pygame.image.load("board.png")
 
@@ -171,12 +173,22 @@ while True:
             mouseX, mouseY = pygame.mouse.get_pos()
             if gamestate == "main":
                 if 300 < mouseX < 940 and 270 < mouseY < 370:
-                    gamestate = "start"
+                    gamestate = "ChooseTrack"
                     lightSound.play()
             if gamestate == "stats":
                 if 520 < mouseX < 1160 and 500 < mouseY < 600:
                     gamestate = "main"
-
+            if gamestate == "ChooseTrack":
+                if 480 < mouseX < 835 and 50 < mouseY < 287:
+                    CurrentTrack = bahrainTrack
+                    gamestate = "start"
+                elif 480 < mouseX < 835 and 450 < mouseY < 687:
+                    CurrentTrack = silverstoneTrack
+                    gamestate = "start"
+                    trackX = -7607.0
+                    trackY = -5660.0
+                    angle = -39
+                    
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
             if DRS == False:
@@ -206,15 +218,7 @@ while True:
                
     
     if gamestate == "start":
-        screen.blit(bahrainTrack, (trackX,trackY))
-
-        #Reference #2
-        cx = 500 + 152 / 2
-        cy = 300 + 103 / 2
-
-        local_front = pygame.Vector2(-152/2, 0)
-        front_pos = pygame.Vector2(cx, cy) + local_front.rotate(-angle)
-        #End Reference #2
+        screen.blit(CurrentTrack, (trackX,trackY))
 
         frontColor = screen.get_at((640, 360))
         
@@ -295,9 +299,11 @@ while True:
             car = Alpine
             maxSpeed = 10.5
 
+
         if keys[pygame.K_s]:
             if speed > 0:
                 speed -= 0.1
+        
 
 
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
@@ -484,6 +490,23 @@ while True:
         screen.blit(f1font.render('Settings', True, ("black")) , (440, 450)) 
         screen.blit(f1font.render('Race', True, ("black")) , (520, 290))
 
+    elif gamestate == "ChooseTrack":
+        screen.blit(menu, (0,0))
+
+        if 480 < mouseX < 835 and 50 < mouseY < 287:
+            pygame.draw.rect(screen, ("white"), (480, 50, 355, 237),0,20)
+        else:
+            pygame.draw.rect(screen, ("light grey"), (480, 50, 355, 237),0,20)
+
+        if 480 < mouseX < 835 and 450 < mouseY < 687:
+            pygame.draw.rect(screen, ("white"), (480, 450, 355, 237),0,20)
+        else:
+            pygame.draw.rect(screen, ("light grey"), (480, 450, 355, 237),0,20)
+
+        screen.blit(bahrainMinimap, (530,100))
+        screen.blit(silverstoneMinimap, (530,500))
+
+
     elif gamestate == "stats":
         screen.blit(stats, (0,0))
         screen.blit(pygame.transform.scale(pygame.transform.rotate(car, -90), (206, 304)), (130,200))
@@ -495,7 +518,7 @@ while True:
         else:
             pygame.draw.rect(screen, ("light grey"), (520, 500, 640, 100),0,30)
         screen.blit(f1font.render('Main Menu', True, ("dark grey")) , (640, 520))
-    print(ii,flag,speed)
+    print(angle)
     pygame.display.flip()
     clock.tick(60)
 
