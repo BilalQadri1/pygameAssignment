@@ -188,7 +188,7 @@ while True:
                     trackX = -7607.0
                     trackY = -5660.0
                     angle = -39
-                    
+
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
             if DRS == False:
@@ -262,10 +262,13 @@ while True:
         xTravelled = round(speed * math.cos(angleRadians) ,0)
         yTravelled = round(speed * -math.sin(angleRadians) ,0)
         # End Reference #1
-        
-        if -12142.0 < (trackX + xTravelled) < 0:
+        if CurrentTrack == bahrainTrack:
+            if -12142.0 < (trackX + xTravelled) < 0:
+                trackX += xTravelled
+            if -6347.0 < (trackY + yTravelled) < 0:
+                trackY += yTravelled
+        else:
             trackX += xTravelled
-        if -6347.0 < (trackY + yTravelled) < 0:
             trackY += yTravelled
 
         if keys[pygame.K_1]:
@@ -421,8 +424,11 @@ while True:
         screen.blit(f1font2.render(str(int(FRTW)), True, (255, 255, 255)) , (1208, 535))
         screen.blit(f1font2.render(str(int(RLTW)), True, (255, 255, 255)) , (1125, 640))
         screen.blit(f1font2.render(str(int(RRTW)), True, (255, 255, 255)) , (1208, 640))
+        if CurrentTrack == bahrainTrack:        
+            screen.blit((bahrainMinimap), (20, 550))
+        else:
+            screen.blit((silverstoneMinimap), (20, 550))
 
-        screen.blit((bahrainMinimap), (20, 550))
 
         
 
