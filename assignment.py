@@ -157,6 +157,7 @@ carSound = pygame.mixer.Sound(os.path.join("engine.mp3"))
 carSound.set_volume(0)
 carSound.play(-1)
 
+crashbg = pygame.transform.scale(pygame.image.load("crash.png"), (1280,720))
 flag = "none"
 ii = 0
 # *********GAME LOOP**********
@@ -174,20 +175,89 @@ while True:
             if gamestate == "main":
                 if 300 < mouseX < 940 and 270 < mouseY < 370:
                     gamestate = "ChooseTrack"
-                    lightSound.play()
+                elif 300 < mouseX < 940 and 430 < mouseY < 530:
+                    gamestate = "carSelect"
+
             if gamestate == "stats":
                 if 520 < mouseX < 1160 and 500 < mouseY < 600:
                     gamestate = "main"
+                    lap = 0
+                    lap1time = 0
+                    lap2time = 0
+                    lap3time = 0
+                    speed = 0
+                    lightsOut = False
+                    lights = -1
+
             if gamestate == "ChooseTrack":
                 if 480 < mouseX < 835 and 50 < mouseY < 287:
                     CurrentTrack = bahrainTrack
                     gamestate = "start"
+                    trackX = -6685.0
+                    trackY = -6261.0
+                    angle = 0
+                    lightSound.play() 
+
                 elif 480 < mouseX < 835 and 450 < mouseY < 687:
                     CurrentTrack = silverstoneTrack
                     gamestate = "start"
                     trackX = -7607.0
                     trackY = -5660.0
                     angle = -39
+                    lightSound.play() 
+
+            if gamestate == "carSelect":
+                if 30 < mouseX < 90 and 30 < mouseY < 90:
+                    gamestate = "main"
+                elif 120 < mouseX < 305 and 20 < mouseY < 294:
+                    car =   Mclaren
+                    maxSpeed = 15
+                elif 320 < mouseX < 515 and 20 < mouseY < 294:
+                    car = Mercedes
+                    maxSpeed = 14.5
+                elif 520 < mouseX < 715 and 20 < mouseY < 294:
+                    car = Redbull
+                    maxSpeed = 14
+                elif 720 < mouseX < 915 and 20 < mouseY < 294:
+                    car = VCARB
+                    maxSpeed = 13.5
+                elif 920 < mouseX < 1115 and 20 < mouseY < 294 :
+                    car =   ferrari
+                    maxSpeed = 13
+                elif 120 < mouseX < 305 and 350 < mouseY < 624 :
+                    car = Williams
+                    maxSpeed = 12.5
+                elif 320 < mouseX < 515 and 350 < mouseY < 624 :
+                    car = AstonMartin
+                    maxSpeed = 12
+                elif 520 < mouseX < 715 and 350 < mouseY < 624 :
+                    car = Haas
+                    maxSpeed = 11.5
+                elif 720 < mouseX < 915 and 350 < mouseY < 624 :
+                    car = Sauber
+                    maxSpeed = 11
+                elif 920 < mouseX < 1115 and 350 < mouseY < 624 :
+                    car = Alpine
+                    maxSpeed = 10.5
+                
+            if gamestate == "crash":
+                lap = 0
+                lap1time = 0
+                lap2time = 0
+                lap3time = 0
+                speed = 0
+                lightsOut = False
+                lights = -1
+                FLTW = 99
+                FRTW = 99
+                RLTW = 99
+                RRTW = 99
+                tyresintact = True
+                trackLimitsWarning = 0
+                pendingPenalty = False
+                TimePenalty = 0
+                if 30 < mouseX < 90 and 30 < mouseY < 90:
+                    gamestate = "main"
 
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
@@ -216,7 +286,6 @@ while True:
             else:
                 DRS = False   
                
-    
     if gamestate == "start":
         screen.blit(CurrentTrack, (trackX,trackY))
 
@@ -227,6 +296,7 @@ while True:
                 FLTW = 0
                 FRTW = 0
                 iAmStupid.play()
+                gamestate = "crash"
                 carSound.set_volume(0)
 
             else:
@@ -245,7 +315,6 @@ while True:
             else:
                 TimePenalty += 3
                 pendingPenalty = False
-
 
         keys = pygame.key.get_pressed()
 
@@ -267,9 +336,11 @@ while True:
                 trackX += xTravelled
             if -6347.0 < (trackY + yTravelled) < 0:
                 trackY += yTravelled
-        else:
-            trackX += xTravelled
-            trackY += yTravelled
+        elif CurrentTrack == silverstoneTrack:
+            if -12142.0 < (trackX + xTravelled) < 460:
+                trackX += xTravelled
+            if -6347.0 < (trackY + yTravelled) < 0:
+                trackY += yTravelled
 
         if keys[pygame.K_1]:
             car =   Mclaren
@@ -302,13 +373,10 @@ while True:
             car = Alpine
             maxSpeed = 10.5
 
-
         if keys[pygame.K_s]:
             if speed > 0:
                 speed -= 0.1
         
-
-
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             tyresintact = False
 
@@ -325,6 +393,7 @@ while True:
         else:
             if speed > 0:
                 speed -= 0.1
+
         if lightsOut:
             if 20*speed < 150:
                 ii += 0.5
@@ -334,6 +403,7 @@ while True:
             else:
                 flag = "none"
                 ii = 0
+
         if tyresintact and lightsOut:
             if DRS:
                 if keys[pygame.K_w] and speed < maxSpeed +5:
@@ -342,12 +412,16 @@ while True:
                 if speed > maxSpeed:
                     speed -= 0.1
 
-        if (round(trackX,0)) < -6600.0 and (round(trackX,0)) > -6650.0 and trackY > -6347 and trackY < -6034 and not crossing:
-            lap += 1
-            crossing = True
+        if CurrentTrack == bahrainTrack:
+            if (round(trackX,0)) < -6600.0 and (round(trackX,0)) > -6650.0 and trackY > -6347 and trackY < -6034 and not crossing:
+                lap += 1
+                crossing = True
 
+        elif CurrentTrack == silverstoneTrack:
+            if (round(trackX,0)) < -7482.0 and (round(trackX,0)) > -7709.0 and trackY > -5712.0 and trackY < -5458.0 and not crossing:
+                lap += 1
+                crossing = True
 
-        
         if lap == 1:
             lap1time = round( time,2)
         elif lap == 2:
@@ -355,9 +429,13 @@ while True:
 
         elif lap == 3:
             lap3time =  round(time - lap2time - lap1time,2)
-        if not ((round(trackX,0)) < -6600.0 and (round(trackX,0)) > -6650.0 and trackY > -6347 and trackY < -6034):
-            crossing = False
 
+        if CurrentTrack == bahrainTrack:
+            if not ((round(trackX,0)) < -6600.0 and (round(trackX,0)) > -6650.0 and trackY > -6347 and trackY < -6034):
+                crossing = False
+        elif CurrentTrack == silverstoneTrack:
+            if not ((round(trackX,0)) < -7482.0 and (round(trackX,0)) > -7709.0 and trackY > -5712.0 and trackY < -5458.0):
+                crossing = False
 
         screen.blit(f1font2.render(("lap # " + str(lap)), True, (255, 255, 255)) , (20, 20)) 
         screen.blit(numberFont.render((str(int(20*speed))), True, (255, 255, 255)) , (600, 20)) 
@@ -368,7 +446,6 @@ while True:
         if lap3time > 0:
             screen.blit(f1font2.render(("lap 3: " +str(lap3time)), True, ("white")) , (1050, 80)) 
 
-        
         if lap == 2:
             if lap1time < lap2time:
                 screen.blit(f1font2.render(("lap 1: " +str(lap1time)), True, (85, 26, 139)) , (1050, 20))
@@ -429,9 +506,6 @@ while True:
         else:
             screen.blit((silverstoneMinimap), (20, 550))
 
-
-        
-
         if DRS:
             screen.blit(pygame.transform.rotate(carDRS, angle), (500, 300))
         else:
@@ -474,10 +548,7 @@ while True:
         pygame.draw.circle(screen, (255,0,0),(minimapX,minimapY ), 7)
         speed = round(speed,1)
 
-
     mouseX, mouseY = pygame.mouse.get_pos()
-
-
 
     if gamestate == "main":
         screen.blit(menu, (0,0))
@@ -493,7 +564,7 @@ while True:
         else:
             pygame.draw.rect(screen, (220, 220, 220), (300, 270, 640, 100),0,20)
 
-        screen.blit(f1font.render('Settings', True, ("black")) , (440, 450)) 
+        screen.blit(f1font.render('Car', True, ("black")) , (540, 450)) 
         screen.blit(f1font.render('Race', True, ("black")) , (520, 290))
 
     elif gamestate == "ChooseTrack":
@@ -524,9 +595,68 @@ while True:
         else:
             pygame.draw.rect(screen, ("light grey"), (520, 500, 640, 100),0,30)
         screen.blit(f1font.render('Main Menu', True, ("dark grey")) , (640, 520))
-    print(angle)
+
+    elif gamestate == "carSelect":
+        screen.blit(menu, (0,0))
+        if 120 < mouseX < 305 and 20 < mouseY < 294 or car == Mclaren:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mclaren, -90), (144, 213)), (140,40))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mclaren, -90), (185, 274)), (120,20))
+        if 320 < mouseX < 515 and 20 < mouseY < 294 or car == Mercedes:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mercedes, -90), (144, 213)), (340,40))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mercedes, -90), (185, 274)), (320,20))
+        if 520 < mouseX < 715 and 20 < mouseY < 294 or car == Redbull:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Redbull, -90), (144, 213)), (540,40))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Redbull, -90), (185, 274)), (520,20))
+        if 720 < mouseX < 915 and 20 < mouseY < 294 or car == VCARB:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(VCARB, -90), (144, 213)), (740,40))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(VCARB, -90), (185, 274)), (720,20))
+        if 920 < mouseX < 1115 and 20 < mouseY < 294 or car == ferrari:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(ferrari, -90), (144, 213)), (940,40))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(ferrari, -90), (185, 274)), (920,20))
+        if 120 < mouseX < 305 and 350 < mouseY < 624 or car == Williams:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Williams, -90), (144, 213)), (140,370))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Williams, -90), (185, 274)), (120,350))
+        if 320 < mouseX < 515 and 350 < mouseY < 624 or car == AstonMartin:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(AstonMartin, -90 ), (144, 213)), (340,370))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(AstonMartin, -90 ), (185, 274)), (320,350))
+        if 520 < mouseX < 715 and 350 < mouseY < 624 or car == Haas:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Haas, -90), (144, 213)), (540,370))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Haas, -90), (185, 274)), (520,350))
+        if 720 < mouseX < 915 and 350 < mouseY < 624 or car == Sauber:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Sauber, -90), (144, 213)), (740,370))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Sauber, -90), (185, 274)), (720,350))
+        if 920 < mouseX < 1115 and 350 < mouseY < 624 or car == Alpine:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Alpine, -90), (144, 213)), (940,370))
+        else:
+            screen.blit(pygame.transform.scale(pygame.transform.rotate(Alpine, -90), (185, 274)), (920,350))
+
+        if 30 < mouseX < 90 and 30 < mouseY < 90:
+            pygame.draw.circle(screen, ("white"), (60, 60), 30)
+        else:
+            pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+    elif gamestate == "crash":
+        screen.blit(crashbg, (0,0))
+        if 30 < mouseX < 90 and 30 < mouseY < 90:
+            pygame.draw.circle(screen, ("white"), (60, 60), 30)
+        else:
+            pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        screen.blit(f1font.render("You Crashed", True, ("black")) , (480, 300))
+
+    print(trackX, trackY)
     pygame.display.flip()
     clock.tick(60)
 
-
-pygame.quit()
+pygame.quit() 
