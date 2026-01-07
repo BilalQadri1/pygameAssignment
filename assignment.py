@@ -342,37 +342,6 @@ while True:
             if -6347.0 < (trackY + yTravelled) < 0:
                 trackY += yTravelled
 
-        if keys[pygame.K_1]:
-            car =   Mclaren
-            maxSpeed = 15
-        elif keys[pygame.K_2]:
-            car = Mercedes
-            maxSpeed = 14.5
-        elif keys[pygame.K_3]:
-            car = Redbull
-            maxSpeed = 14
-        elif keys[pygame.K_4]:
-            car = VCARB
-            maxSpeed = 13.5
-        elif keys[pygame.K_5]:
-            car = ferrari
-            maxSpeed = 13
-        elif keys[pygame.K_6]:
-            car = Williams
-            maxSpeed = 12.5
-        elif keys[pygame.K_7]:
-            car = AstonMartin
-            maxSpeed = 12
-        elif keys[pygame.K_8]:
-            car = Haas
-            maxSpeed = 11.5
-        elif keys[pygame.K_9]:
-            car = Sauber
-            maxSpeed = 11
-        elif keys[pygame.K_0]:
-            car = Alpine
-            maxSpeed = 10.5
-
         if keys[pygame.K_s]:
             if speed > 0:
                 speed -= 0.1
