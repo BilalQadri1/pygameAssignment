@@ -148,7 +148,6 @@ tyresintact = True
 i = 0
 
 #penalty variables
-trackLimitsWarning = 0
 pendingPenalty = False
 TimePenalty = 0
 gamestate = "main"
@@ -163,6 +162,8 @@ flag = "none"
 ii = 0
 pitstop = False
 
+gear = 1
+carMaxSpeed = maxSpeed
 def pitstopReset():
     global FLTW, FLTWC, FRTW, FRTWC, RLTW, RLTWC, RRTW, RRTWC, tyresintact
     FLTW = 99
@@ -212,6 +213,20 @@ while True:
                     trackY = -6261.0
                     angle = 0
                     lightSound.play() 
+                    lap = 0
+                    lap1time = 0
+                    lap2time = 0
+                    lap3time = 0
+                    speed = 0
+                    lightsOut = False
+                    lights = -1
+                    FLTW = 99
+                    FRTW = 99
+                    RLTW = 99
+                    RRTW = 99
+                    tyresintact = True
+                    pendingPenalty = False
+                    TimePenalty = 0
 
                 elif 480 < mouseX < 835 and 450 < mouseY < 687:
                     CurrentTrack = silverstoneTrack
@@ -229,51 +244,46 @@ while True:
                     gamestate = "main"
                 elif 120 < mouseX < 305 and 20 < mouseY < 294:
                     car =   Mclaren
-                    maxSpeed = 15
+                    carMaxSpeed = 15
+                    maxSpeed = carMaxSpeed
                 elif 320 < mouseX < 515 and 20 < mouseY < 294:
                     car = Mercedes
-                    maxSpeed = 14.5
+                    carMaxSpeed = 14.5
+                    maxSpeed = carMaxSpeed
                 elif 520 < mouseX < 715 and 20 < mouseY < 294:
                     car = Redbull
-                    maxSpeed = 14
+                    carMaxSpeed = 14
+                    maxSpeed = carMaxSpeed
                 elif 720 < mouseX < 915 and 20 < mouseY < 294:
                     car = VCARB
-                    maxSpeed = 13.5
+                    carMaxSpeed = 13.5
+                    maxSpeed = carMaxSpeed
                 elif 920 < mouseX < 1115 and 20 < mouseY < 294 :
                     car =   ferrari
-                    maxSpeed = 13
+                    carMaxSpeed = 13
+                    maxSpeed = carMaxSpeed
                 elif 120 < mouseX < 305 and 350 < mouseY < 624 :
                     car = Williams
-                    maxSpeed = 12.5
+                    carMaxSpeed = 12.5
+                    maxSpeed = carMaxSpeed
                 elif 320 < mouseX < 515 and 350 < mouseY < 624 :
                     car = AstonMartin
-                    maxSpeed = 12
+                    carMaxSpeed = 12
+                    maxSpeed = carMaxSpeed
                 elif 520 < mouseX < 715 and 350 < mouseY < 624 :
                     car = Haas
-                    maxSpeed = 11.5
+                    carMaxSpeed = 11.5
+                    maxSpeed = carMaxSpeed
                 elif 720 < mouseX < 915 and 350 < mouseY < 624 :
                     car = Sauber
-                    maxSpeed = 11
+                    carMaxSpeed = 11
+                    maxSpeed = carMaxSpeed
                 elif 920 < mouseX < 1115 and 350 < mouseY < 624 :
                     car = Alpine
-                    maxSpeed = 10.5
+                    carMaxSpeed = 10.5
+                    maxSpeed = carMaxSpeed
                 
             if gamestate == "crash":
-                lap = 0
-                lap1time = 0
-                lap2time = 0
-                lap3time = 0
-                speed = 0
-                lightsOut = False
-                lights = -1
-                FLTW = 99
-                FRTW = 99
-                RLTW = 99
-                RRTW = 99
-                tyresintact = True
-                trackLimitsWarning = 0
-                pendingPenalty = False
-                TimePenalty = 0
                 if 30 < mouseX < 90 and 30 < mouseY < 90:
                     gamestate = "main"
 
@@ -303,6 +313,14 @@ while True:
                 DRS = True
             else:
                 DRS = False   
+        if ev.key == pygame.K_UP and gear != 8:
+            gear += 1
+
+        elif ev.key == pygame.K_DOWN and gear != 1:
+            gear -= 1
+
+        if ev.key == pygame.K_UP or ev.key == pygame.K_DOWN:
+            maxSpeed = (carMaxSpeed-8) + gear
                
     if gamestate == "start":
         screen.blit(CurrentTrack, (trackX,trackY))
@@ -376,12 +394,8 @@ while True:
             pendingPenalty = True
 
         if pendingPenalty == True and centerColor == (22,22,22):
-            if trackLimitsWarning < 3:
-                trackLimitsWarning += 1
-                print("track limits warning #" + str(trackLimitsWarning))
-            else:
-                TimePenalty += 3
-                pendingPenalty = False
+            TimePenalty += 3
+            pendingPenalty = False
 
 
         keys = pygame.key.get_pressed()
@@ -400,7 +414,9 @@ while True:
                 else:
                     angle-=3
                 FRTW -= 0.01
-        
+
+            
+
         # Reference #1
         angleRadians = math.radians(angle)
         xTravelled = round(speed * math.cos(angleRadians) ,0)
@@ -432,6 +448,9 @@ while True:
         else:
             if speed > 0:
                 speed -= 0.1
+
+        if speed > maxSpeed:
+            speed -= 0.1
 
         if lightsOut:
             if 20*speed < 150:
@@ -478,6 +497,7 @@ while True:
 
         screen.blit(f1font2.render(("lap # " + str(lap)), True, (255, 255, 255)) , (20, 20)) 
         screen.blit(numberFont.render((str(int(20*speed))), True, (255, 255, 255)) , (600, 20)) 
+        screen.blit(numberFont.render(str(gear), True, (255, 255, 255)) , (600, 650)) 
         
         screen.blit(f1font2.render(("lap 1: " +str(lap1time)), True, ("white")) , (1050, 20))
         if lap2time > 0:
@@ -703,6 +723,7 @@ while True:
 
         screen.blit(f1font.render("You Crashed", True, ("black")) , (480, 300))
 
+    print(maxSpeed, gear)
     pygame.display.flip()
     clock.tick(60)
 
