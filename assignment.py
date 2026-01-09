@@ -50,68 +50,76 @@ import os
 import time
 import random
 import gif_pygame
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 pygame.init()
 
 # *********SETUP**********
 
 windowWidth = 1280
 windowHeight = 720
+
+ferrari = pygame.image.load(os.path.join(script_dir,os.path.join(script_dir,"ferrari.png")))
+
 screen = pygame.display.set_mode((windowWidth, windowHeight))
 clock = pygame.time.Clock()  
-bahrainTrack = pygame.transform.scale(pygame.image.load("bahrain.png"), (12800,7200))
-bahrainMinimap = pygame.transform.scale(pygame.image.load("BahrainMinimap.png"), (256,144))
-silverstoneTrack = pygame.transform.scale(pygame.image.load("silverstone.png"), (12800,7200))
-silverstoneMinimap = pygame.transform.scale(pygame.image.load("silverstoneMinimap.png"), (256,144))
+bahrainTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"bahrain.png")), (12800,7200))
+bahrainMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"BahrainMinimap.png")), (256,144))
+silverstoneTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"silverstone.png")), (12800,7200))
+silverstoneMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"silverstoneMinimap.png")), (256,144))
 
 currentTrack = bahrainTrack
-menu = pygame.transform.scale(pygame.image.load("menu.png"), (1280,720))
-stats = pygame.image.load("board.png")
+menu = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"menu.png")), (1280,720))
+stats = pygame.image.load(os.path.join(script_dir,"board.png"))
 
 
-f1logo = pygame.transform.scale(pygame.image.load("F1logo.png"), (388.5,100))
-f1font = pygame.font.Font("f1font.ttf", 60)
-f1font2 = pygame.font.Font("f1font.ttf", 30)
+f1logo = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"F1logo.png")), (388.5,100))
+f1font = pygame.font.Font(os.path.join(script_dir,os.path.join(script_dir,"f1font.ttf")), 60)
+f1font2 = pygame.font.Font(os.path.join(script_dir,os.path.join(script_dir,"f1font.ttf")), 30)
 
-fireworks = gif_pygame.load("giphy.gif")
+fireworks = gif_pygame.load(os.path.join(script_dir,os.path.join(script_dir,"giphy.gif")))
 
 #teams
-ferrari = pygame.image.load("ferrari.png")
-Mclaren = pygame.image.load("Mclaren.png")
-Redbull = pygame.image.load("Redbull.png")
-Mercedes = pygame.image.load("Mercedes.png")
-Williams = pygame.image.load("Williams.png")
-VCARB = pygame.image.load("VCARB.png")
-AstonMartin = pygame.image.load("AstonMartin.png")
-Haas = pygame.image.load("Haas.png")
-Alpine = pygame.image.load("Alpine.png")
-Sauber = pygame.image.load("Sauber.png")
+ferrari = pygame.image.load(os.path.join(script_dir,"ferrari.png"))
+Mclaren = pygame.image.load(os.path.join(script_dir,"Mclaren.png"))
+Redbull = pygame.image.load(os.path.join(script_dir,"Redbull.png"))
+Mercedes = pygame.image.load(os.path.join(script_dir,"Mercedes.png"))
+Williams = pygame.image.load(os.path.join(script_dir,"Williams.png"))
+VCARB = pygame.image.load(os.path.join(script_dir,"VCARB.png"))
+AstonMartin = pygame.image.load(os.path.join(script_dir,"AstonMartin.png"))
+Haas = pygame.image.load(os.path.join(script_dir,"Haas.png"))
+Alpine = pygame.image.load(os.path.join(script_dir,"Alpine.png"))
+Sauber = pygame.image.load(os.path.join(script_dir,"Sauber.png"))
 
 car = ferrari
 
 #tyres wear colors
-tyresG = pygame.transform.scale(pygame.image.load("tyresG.png"), (60.5,90.5))
-tyresY = pygame.transform.scale(pygame.image.load("tyresY.png"), (60.5,90.5))
-tyresR = pygame.transform.scale(pygame.image.load("tyresR.png"), (60.5,90.5))
+tyresG = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"tyresG.png")), (60.5,90.5))
+tyresY = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"tyresY.png")), (60.5,90.5))
+tyresR = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"tyresR.png")), (60.5,90.5))
 tyres = tyresG
 
 #animated tyre images
-treads1 = pygame.image.load("treads1.png")
-treads2 = pygame.image.load("treads2.png")
+treads1 = pygame.image.load(os.path.join(script_dir,"treads1.png"))
+treads2 = pygame.image.load(os.path.join(script_dir,"treads2.png"))
 
 #starting race lights  countdown
-lights0 = pygame.transform.scale(pygame.image.load("lights0.png"), (520,560))
-lights1 = pygame.transform.scale(pygame.image.load("lights1.png"), (520,560))
-lights2 = pygame.transform.scale(pygame.image.load("lights2.png"), (520,560))
-lights3 = pygame.transform.scale(pygame.image.load("lights3.png"), (520,560))
-lights4 = pygame.transform.scale(pygame.image.load("lights4.png"), (520,560))
+lights0 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights0.png")), (520,560))
+lights1 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights1.png")), (520,560))
+lights2 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights2.png")), (520,560))
+lights3 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights3.png")), (520,560))
+lights4 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights4.png")), (520,560))
 lights = -1
 lightsOut = False
-lightSound = pygame.mixer.Sound(os.path.join("lightSound.mp3"))
-awayWeGo = pygame.mixer.Sound(os.path.join("lightsout.mp3"))
+lightSound = pygame.mixer.Sound(os.path.join(script_dir,"lightSound.png"))
+
+
+awayWeGo = pygame.mixer.Sound(os.path.join(script_dir,"lightsout.mp3"))
 lightPlay = True
 
-iAmStupid = pygame.mixer.Sound(os.path.join("iAmStupid.mp3"))
-carDRS = pygame.image.load("FerrariDRS.png")
+iAmStupid = pygame.mixer.Sound(os.path.join(script_dir,"iAmStupid.mp3"))
+carDRS = pygame.image.load(os.path.join(script_dir,"FerrariDRS.png"))
 
 
 speed = 0
@@ -122,7 +130,6 @@ angle = 0
 lap = 0
 crossing = False
 maxSpeed = 11
-script_dir = os.path.dirname(os.path.abspath(__file__))
 time = 0
 lap1time = 0
 lap2time = 0
@@ -153,17 +160,20 @@ TimePenalty = 0
 gamestate = "main"
 
 #car sound effects
-carSound = pygame.mixer.Sound(os.path.join("engine.mp3"))
+carSound = pygame.mixer.Sound(os.path.join(script_dir,"engine.mp3"))
 carSound.set_volume(0)
 carSound.play(-1)
 
-crashbg = pygame.transform.scale(pygame.image.load("crash.png"), (1280,720))
+crashbg = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"crash.png")), (1280,720))
 flag = "none"
 ii = 0
 pitstop = False
 
 gear = 1
 carMaxSpeed = maxSpeed
+
+racingLine = False
+
 def pitstopReset():
     global FLTW, FLTWC, FRTW, FRTWC, RLTW, RLTWC, RRTW, RRTWC, tyresintact
     FLTW = 99
@@ -193,6 +203,9 @@ while True:
                     gamestate = "ChooseTrack"
                 elif 300 < mouseX < 940 and 430 < mouseY < 530:
                     gamestate = "carSelect"
+                elif 300 < mouseX < 940 and 570 < mouseY < 670:
+                    gamestate = "settings"
+
 
             if gamestate == "stats":
                 if 520 < mouseX < 1160 and 500 < mouseY < 600:
@@ -283,33 +296,41 @@ while True:
                     carMaxSpeed = 10.5
                     maxSpeed = carMaxSpeed
                 
-            if gamestate == "crash":
+            if gamestate == "crash" or gamestate == "settings":
                 if 30 < mouseX < 90 and 30 < mouseY < 90:
                     gamestate = "main"
+
+            if gamestate == "settings":
+                if 300 < mouseX < 940 and 270 < mouseY < 370:
+                    if racingLine:
+                        racingLine = False
+                    else:
+                        racingLine = True
+
 
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
             if DRS == False:
                 if car == ferrari:
-                    carDRS = pygame.image.load("FerrariDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"FerrariDRS.png"))
                 elif car == Mclaren:
-                    carDRS = pygame.image.load("MclarenDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"MclarenDRS.png"))
                 elif car == Redbull:
-                    carDRS = pygame.image.load("RedbullDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"RedbullDRS.png"))
                 elif car == Mercedes:
-                    carDRS = pygame.image.load("MercedesDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"MercedesDRS.png"))
                 elif car == Williams:
-                    carDRS = pygame.image.load("WilliamsDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"WilliamsDRS.png"))
                 elif car == VCARB:
-                    carDRS = pygame.image.load("VCARBDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"VCARBDRS.png"))
                 elif car == AstonMartin:
-                    carDRS = pygame.image.load("AstonMartinDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"AstonMartinDRS.png"))
                 elif car == Haas:
-                    carDRS = pygame.image.load("HaasDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"HaasDRS.png"))
                 elif car == Alpine:
-                    carDRS = pygame.image.load("AlpineDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"AlpineDRS.png"))
                 elif car == Sauber:
-                    carDRS = pygame.image.load("SauberDRS.png")
+                    carDRS = pygame.image.load(os.path.join(script_dir,"SauberDRS.png"))
                 DRS = True
             else:
                 DRS = False   
@@ -386,9 +407,6 @@ while True:
 
         elif centerColor == (36,36,36):
             pitstop = False
-
-        elif centerColor == (18,18,18):
-            print("pitstoppppppp")
 
         elif centerColor.r == 2 and centerColor.g == 96 and centerColor.b == 0:
             pendingPenalty = True
@@ -626,8 +644,14 @@ while True:
         else:
             pygame.draw.rect(screen, (220, 220, 220), (300, 270, 640, 100),0,20)
 
+        if 300 < mouseX < 940 and 570 < mouseY < 670:
+            pygame.draw.rect(screen, ("white"), (300, 570, 640, 100),0,20)
+        else:
+            pygame.draw.rect(screen, (220, 220, 220), (300, 570, 640, 100),0,20)
+
         screen.blit(f1font.render('Car', True, ("black")) , (540, 450)) 
         screen.blit(f1font.render('Race', True, ("black")) , (520, 290))
+        screen.blit(f1font.render('Settings', True, ("black")) , (470, 590))
 
     elif gamestate == "ChooseTrack":
         screen.blit(menu, (0,0))
@@ -723,7 +747,25 @@ while True:
 
         screen.blit(f1font.render("You Crashed", True, ("black")) , (480, 300))
 
-    print(maxSpeed, gear)
+    elif gamestate == "settings":
+        screen.blit(menu, (0,0))
+        if 30 < mouseX < 90 and 30 < mouseY < 90:
+            pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else:
+            pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+
+        if 300 < mouseX < 940 and 270 < mouseY < 370:
+            pygame.draw.rect(screen, ("white"), (300, 270, 640, 100),0,20)
+        else:
+            pygame.draw.rect(screen, (220, 220, 220), (300, 270, 640, 100),0,20)
+        if racingLine:
+            pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
+        screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
+
+
+
     pygame.display.flip()
     clock.tick(60)
 
