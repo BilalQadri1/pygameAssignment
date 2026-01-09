@@ -112,10 +112,13 @@ lights3 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"ligh
 lights4 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights4.png")), (520,560))
 lights = -1
 lightsOut = False
-lightSound = pygame.mixer.Sound(os.path.join(script_dir,"lightSound.png"))
+lightSound = pygame.mixer.Sound(os.path.join(script_dir,"lightSound.mp3"))
+lightSound.set_volume(1)
 
 
 awayWeGo = pygame.mixer.Sound(os.path.join(script_dir,"lightsout.mp3"))
+awayWeGo.set_volume(0.1)
+
 lightPlay = True
 
 iAmStupid = pygame.mixer.Sound(os.path.join(script_dir,"iAmStupid.mp3"))
@@ -161,7 +164,7 @@ gamestate = "main"
 
 #car sound effects
 carSound = pygame.mixer.Sound(os.path.join(script_dir,"engine.mp3"))
-carSound.set_volume(0)
+carSound.set_volume(0.1)
 carSound.play(-1)
 
 crashbg = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"crash.png")), (1280,720))
@@ -225,6 +228,7 @@ while True:
                     trackX = -6685.0
                     trackY = -6261.0
                     angle = 0
+                    lightSound.set_volume(100)
                     lightSound.play() 
                     lap = 0
                     lap1time = 0
@@ -395,7 +399,6 @@ while True:
                 FLTW -= int(2*speed)
                 FRTW -= int(2*speed)
                 iAmStupid.play()
-                carSound.set_volume(0)
 
             else:
                 FLTW -= int(speed)
@@ -611,7 +614,7 @@ while True:
             lightsOut = True
             
         if lights <= 3:
-            lights += random.uniform(0.01, 0.02)
+            lights += 0.01
         elif lights < 99:
             lightsOut == True
             if not pygame.mixer.music.get_busy():
