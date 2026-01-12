@@ -65,8 +65,11 @@ ferrari = pygame.image.load(os.path.join(script_dir,os.path.join(script_dir,"fer
 screen = pygame.display.set_mode((windowWidth, windowHeight))
 clock = pygame.time.Clock()  
 bahrainTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"bahrain.png")), (12800,7200))
+bahrainTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"bahrainLine.png")), (12800,7200))
+
 bahrainMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"BahrainMinimap.png")), (256,144))
 silverstoneTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"silverstone.png")), (12800,7200))
+silverstoneTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"silverstoneLine.png")), (12800,7200))
 silverstoneMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"silverstoneMinimap.png")), (256,144))
 
 currentTrack = bahrainTrack
@@ -223,7 +226,7 @@ while True:
 
             if gamestate == "ChooseTrack":
                 if 480 < mouseX < 835 and 50 < mouseY < 287:
-                    CurrentTrack = bahrainTrack
+                    currentTrack = bahrainTrack
                     gamestate = "start"
                     trackX = -6685.0
                     trackY = -6261.0
@@ -244,14 +247,16 @@ while True:
                     tyresintact = True
                     pendingPenalty = False
                     TimePenalty = 0
+                    time = -7
 
                 elif 480 < mouseX < 835 and 450 < mouseY < 687:
-                    CurrentTrack = silverstoneTrack
+                    currentTrack = silverstoneTrack
                     gamestate = "start"
                     trackX = -7270.0
                     trackY = -5668.0
                     angle = -39
                     lightSound.play() 
+                    time = -7
 
                 elif 30 < mouseX < 90 and 30 < mouseY < 90:
                     gamestate = "main"
@@ -348,7 +353,17 @@ while True:
             maxSpeed = (carMaxSpeed-8) + gear
                
     if gamestate == "start":
-        screen.blit(CurrentTrack, (trackX,trackY))
+        if currentTrack == bahrainTrack:
+            if racingLine:
+                screen.blit(bahrainTrackLine, (trackX,trackY))
+            else:
+                screen.blit(bahrainTrack, (trackX,trackY))
+
+        elif currentTrack == silverstoneTrack:
+            if racingLine:
+                screen.blit(silverstoneTrackLine, (trackX,trackY))
+            else:
+                screen.blit(silverstoneTrack, (trackX,trackY))
         
         centerColor = screen.get_at((616, 444))
 
@@ -398,7 +413,8 @@ while True:
             if DRS:
                 FLTW -= int(2*speed)
                 FRTW -= int(2*speed)
-                iAmStupid.play()
+                if not pygame.mixer.music.get_busy():
+                    iAmStupid.play()
 
             else:
                 FLTW -= int(speed)
@@ -491,12 +507,12 @@ while True:
                 if speed > maxSpeed:
                     speed -= 0.1
 
-        if CurrentTrack == bahrainTrack:
+        if currentTrack == bahrainTrack:
             if (round(trackX,0)) > -6502.0 and (round(trackX,0)) < -6419.0 and trackY > -6347 and trackY < -6034 and not crossing:
                 lap += 1
                 crossing = True
 
-        elif CurrentTrack == silverstoneTrack:
+        elif currentTrack == silverstoneTrack:
             if (round(trackX,0)) < -7166.0 and (round(trackX,0)) > -7363.0 and trackY > -5713.0 and trackY < -5461.0 and not crossing:
                 lap += 1
                 crossing = True
@@ -509,10 +525,10 @@ while True:
         elif lap == 3:
             lap3time =  round(time - lap2time - lap1time,2)
 
-        if CurrentTrack == bahrainTrack:
+        if currentTrack == bahrainTrack:
             if not ((round(trackX,0)) > -6502.0 and (round(trackX,0)) < -6419.0 and trackY > -6347 and trackY < -6034):
                 crossing = False
-        elif CurrentTrack == silverstoneTrack:
+        elif currentTrack == silverstoneTrack:
             if not ((round(trackX,0)) < -7166.0 and (round(trackX,0)) > -7363.0 and trackY > -5713.0 and trackY < -5461.0):
                 crossing = False
 
@@ -581,9 +597,9 @@ while True:
         screen.blit(f1font2.render(str(int(FRTW)), True, (255, 255, 255)) , (1208, 535))
         screen.blit(f1font2.render(str(int(RLTW)), True, (255, 255, 255)) , (1125, 640))
         screen.blit(f1font2.render(str(int(RRTW)), True, (255, 255, 255)) , (1208, 640))
-        if CurrentTrack == bahrainTrack:        
+        if currentTrack == bahrainTrack:        
             screen.blit((bahrainMinimap), (20, 550))
-        elif CurrentTrack == silverstoneTrack:
+        elif currentTrack == silverstoneTrack:
             screen.blit((silverstoneMinimap), (20, 550))
 
         if DRS:
@@ -634,6 +650,7 @@ while True:
     mouseX, mouseY = pygame.mouse.get_pos()
     
     if gamestate == "main":
+        pygame.mixer.stop()
         screen.blit(menu, (0,0))
         fireworks.render(screen,(0,0))
         screen.blit(f1logo, (440,100))
@@ -766,7 +783,6 @@ while True:
         if racingLine:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
-
 
 
     pygame.display.flip()
