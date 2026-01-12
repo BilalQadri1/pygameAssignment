@@ -419,9 +419,14 @@ while True:
             else:
                 FLTW -= int(speed)
                 FRTW -= int(speed)
-            speed = -5
+        if centerColor == (127,127,127) and not keys[pygame.K_LSHIFT]:
+            speed = -10
+        else:
+            if speed < 0:
+                print("less than 0")
+                speed += 0.2
         
-        elif centerColor == (28,28,28):
+        if centerColor == (28,28,28):
             pitstop = True
 
         elif centerColor == (36,36,36):
@@ -472,7 +477,7 @@ while True:
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             tyresintact = False
 
-        if keys[pygame.K_w] and lightsOut and tyresintact:
+        if keys[pygame.K_w] and lightsOut and tyresintact and speed >= 0:
             if speed < maxSpeed:
                 speed += 0.1
             if RRTW >= 0 and RLTW >= 0:
@@ -534,7 +539,7 @@ while True:
 
         screen.blit(f1font2.render(("lap # " + str(lap)), True, (255, 255, 255)) , (20, 20)) 
         screen.blit(numberFont.render((str(int(20*speed))), True, (255, 255, 255)) , (600, 20)) 
-        screen.blit(numberFont.render(str(gear), True, (255, 255, 255)) , (600, 650)) 
+        screen.blit(f1font.render(str(gear), True, (255, 255, 255)) , (600, 650)) 
         
         screen.blit(f1font2.render(("lap 1: " +str(lap1time)), True, ("white")) , (1050, 20))
         if lap2time > 0:
@@ -604,6 +609,7 @@ while True:
 
         if DRS:
             screen.blit(pygame.transform.rotate(carDRS, angle), (500, 300))
+            screen.blit(f1font2.render("DRS ACTIVE", True, (255, 255, 255)) , (520, 100))
         else:
             screen.blit(pygame.transform.rotate(car, angle), (500, 300))
         if speed > 0:
