@@ -544,14 +544,17 @@ while True:
         if -6347.0 < (trackY + yTravelled) < 0:
             trackY += yTravelled
 
-        if (keys[pygame.K_w] or joystick.get_button(4)):
-            if speed > 0:
-                speed -= 0.1
+
+
+        if controller and lightsOut and tyresintact:
+            if joystick.get_button(4):
+                if speed > 0:
+                    speed -= 0.1
         
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             tyresintact = False
 
-        if ((keys[pygame.K_w] or joystick.get_button(5)) or joystick.get_button(5)) and lightsOut and tyresintact and speed >= 0:
+        if keys[pygame.K_w] and lightsOut and tyresintact:
             if speed < maxSpeed:
                 speed += 0.1
             if RRTW >= 0 and RLTW >= 0:
@@ -561,6 +564,18 @@ while True:
                 else:
                     RLTW -= 0.005
                     RRTW -= 0.005
+
+        elif controller and lightsOut and tyresintact:
+            if joystick.get_button(5) and speed >= 0:
+                if speed < maxSpeed:
+                    speed += 0.1
+                if RRTW >= 0 and RLTW >= 0:
+                    if DRS:
+                        RLTW -= 0.01
+                        RRTW -= 0.01
+                    else:
+                        RLTW -= 0.005
+                        RRTW -= 0.005
         else:
             if speed > 0:
                 speed -= 0.1
@@ -866,7 +881,7 @@ while True:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
     
-    print(angle)
+    print(maxSpeed)
     pygame.display.flip()
     clock.tick(60)
 
