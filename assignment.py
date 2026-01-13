@@ -1,6 +1,6 @@
 '''
 -----------------------------------------------------------------------------
-Program Name: (never put your personal name or information on the Internet)
+Program Name: F1 Racing Game
 Program Description:
 
 -----------------------------------------------------------------------------
@@ -180,6 +180,8 @@ carMaxSpeed = maxSpeed
 
 racingLine = False
 
+ERS = 0
+
 def pitstopReset():
     global FLTW, FLTWC, FRTW, FRTWC, RLTW, RLTWC, RRTW, RRTWC, tyresintact
     FLTW = 99
@@ -316,7 +318,6 @@ while True:
                     else:
                         racingLine = True
 
-
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
             if DRS == False:
@@ -410,20 +411,20 @@ while True:
                 pitstop = False
 
         if centerColor == (127,127,127) and not keys[pygame.K_LSHIFT]:
-            if DRS:
+            if DRS and speed > 0:
                 FLTW -= int(2*speed)
                 FRTW -= int(2*speed)
                 if not pygame.mixer.music.get_busy():
                     iAmStupid.play()
 
-            else:
+            elif speed > 0:
                 FLTW -= int(speed)
                 FRTW -= int(speed)
+
         if centerColor == (127,127,127) and not keys[pygame.K_LSHIFT]:
             speed = -10
         else:
             if speed < 0:
-                print("less than 0")
                 speed += 0.2
         
         if centerColor == (28,28,28):
@@ -439,7 +440,6 @@ while True:
             TimePenalty += 3
             pendingPenalty = False
 
-
         keys = pygame.key.get_pressed()
 
         if lightsOut and speed > 0:
@@ -448,16 +448,16 @@ while True:
                     angle+=1.5
                 else:
                     angle+=3
-                FLTW -= 0.001
+                if speed > 0:
+                    FLTW -= 0.001
 
             if keys[pygame.K_d]:
                 if FRTW < 70:
                     angle-=1.5
                 else:
                     angle-=3
-                FRTW -= 0.01
-
-            
+                if speed > 0:
+                    FRTW -= 0.01
 
         # Reference #1
         angleRadians = math.radians(angle)
@@ -649,9 +649,13 @@ while True:
         minimapY = trackY / -50 + 560
         pygame.draw.circle(screen, (255,0,0),(minimapX,minimapY ), 7)
         speed = round(speed,1)
+                
+        screen.blit(f1font.render(str(ERS), True, (255, 255, 255)) , (600, 700)) 
 
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             gamestate = "crash"
+    
+
 
     mouseX, mouseY = pygame.mouse.get_pos()
     
@@ -781,7 +785,6 @@ while True:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
-
         if 300 < mouseX < 940 and 270 < mouseY < 370:
             pygame.draw.rect(screen, ("white"), (300, 270, 640, 100),0,20)
         else:
@@ -789,7 +792,6 @@ while True:
         if racingLine:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
-
 
     pygame.display.flip()
     clock.tick(60)
