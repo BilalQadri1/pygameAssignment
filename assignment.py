@@ -48,12 +48,12 @@ import pygame
 import math
 import os
 import time
-import random
 import gif_pygame
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 pygame.init()
+pygame.joystick.init()
 
 # *********SETUP**********
 
@@ -64,6 +64,7 @@ ferrari = pygame.image.load(os.path.join(script_dir,os.path.join(script_dir,"fer
 
 screen = pygame.display.set_mode((windowWidth, windowHeight))
 clock = pygame.time.Clock()  
+#different track options images
 bahrainTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"bahrain.png")), (12800,7200))
 bahrainTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"bahrainLine.png")), (12800,7200))
 
@@ -108,44 +109,59 @@ treads1 = pygame.image.load(os.path.join(script_dir,"treads1.png"))
 treads2 = pygame.image.load(os.path.join(script_dir,"treads2.png"))
 
 #starting race lights  countdown
-lights0 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights0.png")), (520,560))
-lights1 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights1.png")), (520,560))
-lights2 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights2.png")), (520,560))
-lights3 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights3.png")), (520,560))
-lights4 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"lights4.png")), (520,560))
+# traffic light sprites
+lights0 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "lights0.png")), (520, 560)
+)
+lights1 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "lights1.png")), (520, 560)
+)
+lights2 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "lights2.png")), (520, 560)
+)
+lights3 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "lights3.png")), (520, 560)
+)
+lights4 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "lights4.png")), (520, 560)
+)
+
 lights = -1
 lightsOut = False
-lightSound = pygame.mixer.Sound(os.path.join(script_dir,"lightSound.mp3"))
+
+lightSound = pygame.mixer.Sound(os.path.join(script_dir, "lightSound.mp3"))
 lightSound.set_volume(1)
 
-
-awayWeGo = pygame.mixer.Sound(os.path.join(script_dir,"lightsout.mp3"))
+# starting sound effects
+awayWeGo = pygame.mixer.Sound(os.path.join(script_dir, "lightsout.mp3"))
 awayWeGo.set_volume(0.1)
 
 lightPlay = True
 
-iAmStupid = pygame.mixer.Sound(os.path.join(script_dir,"iAmStupid.mp3"))
-carDRS = pygame.image.load(os.path.join(script_dir,"FerrariDRS.png"))
+iAmStupid = pygame.mixer.Sound(os.path.join(script_dir, "iAmStupid.mp3"))
+carDRS = pygame.image.load(os.path.join(script_dir, "FerrariDRS.png"))
 
-
+# reset all variables at the start
 speed = 0
-trackX = -6685 
+trackX = -6685
 trackY = -6261
 trackSize = 1
 angle = 0
 lap = 0
 crossing = False
 maxSpeed = 11
+
 time = 0
 lap1time = 0
 lap2time = 0
 lap3time = 0
+
 font = pygame.font.Font(os.path.join(script_dir, "font.otf"), 28)
 numberFont = pygame.font.Font(os.path.join(script_dir, "numbers.ttf"), 28)
 
 DRS = False
 
-#tyrre wear starting values
+# tyre wear starting values
 FLTW = 99
 FLTWC = tyresG
 
@@ -157,31 +173,46 @@ RLTWC = tyresG
 
 RRTW = 99
 RRTWC = tyresG
+
 tyresintact = True
 i = 0
 
-#penalty variables
+# penalty variables
 pendingPenalty = False
 TimePenalty = 0
 gamestate = "main"
 
-#car sound effects
-carSound = pygame.mixer.Sound(os.path.join(script_dir,"engine.mp3"))
+# car sound
+carSound = pygame.mixer.Sound(os.path.join(script_dir, "engine.mp3"))
 carSound.set_volume(0.1)
 carSound.play(-1)
 
-crashbg = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,"crash.png")), (1280,720))
+# crash background
+crashbg = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, "crash.png")), (1280, 720)
+)
+
+# yellow flag variables
 flag = "none"
 ii = 0
+
 pitstop = False
 
+# starting gear and max speed
 gear = 1
 carMaxSpeed = maxSpeed
 
+# racing line off by default
 racingLine = False
 
 ERS = 0
 
+# turning speed and controller
+controller = False
+turn_speed = 3
+
+
+# Pitstop reset function
 def pitstopReset():
     global FLTW, FLTWC, FRTW, FRTWC, RLTW, RLTWC, RRTW, RRTWC, tyresintact
     FLTW = 99
@@ -194,6 +225,34 @@ def pitstopReset():
     RRTWC = tyresG
     tyresintact = True
 
+# DRS toggle function
+def toggleDRS():
+    global DRS, carDRS
+    if DRS == False:
+        if car == ferrari:
+            carDRS = pygame.image.load(os.path.join(script_dir,"FerrariDRS.png"))
+        elif car == Mclaren:
+            carDRS = pygame.image.load(os.path.join(script_dir,"MclarenDRS.png"))
+        elif car == Redbull:
+            carDRS = pygame.image.load(os.path.join(script_dir,"RedbullDRS.png"))
+        elif car == Mercedes:
+            carDRS = pygame.image.load(os.path.join(script_dir,"MercedesDRS.png"))
+        elif car == Williams:
+            carDRS = pygame.image.load(os.path.join(script_dir,"WilliamsDRS.png"))
+        elif car == VCARB:
+            carDRS = pygame.image.load(os.path.join(script_dir,"VCARBDRS.png"))
+        elif car == AstonMartin:
+            carDRS = pygame.image.load(os.path.join(script_dir,"AstonMartinDRS.png"))
+        elif car == Haas:
+            carDRS = pygame.image.load(os.path.join(script_dir,"HaasDRS.png"))
+        elif car == Alpine:
+            carDRS = pygame.image.load(os.path.join(script_dir,"AlpineDRS.png"))
+        elif car == Sauber:
+            carDRS = pygame.image.load(os.path.join(script_dir,"SauberDRS.png"))
+        DRS = True
+    else:
+        DRS = False   
+
 # *********GAME LOOP**********
 while True:
     time += clock.get_time() / 1000
@@ -201,7 +260,12 @@ while True:
     keys = pygame.key.get_pressed()
 
     # *********EVENTS**********
-    ev = pygame.event.poll()    
+    ev = pygame.event.poll()   
+    if ev.type == pygame.JOYDEVICEADDED:
+        joystick = pygame.joystick.Joystick(ev.device_index)
+        controller = True
+    elif ev.type == pygame.JOYDEVICEREMOVED:
+        controller = False 
     if ev.type == pygame.QUIT: 
         break                   
     if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
@@ -335,30 +399,7 @@ while True:
 
     if ev.type == pygame.KEYDOWN:  
         if ev.key == pygame.K_SPACE:  
-            if DRS == False:
-                if car == ferrari:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"FerrariDRS.png"))
-                elif car == Mclaren:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"MclarenDRS.png"))
-                elif car == Redbull:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"RedbullDRS.png"))
-                elif car == Mercedes:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"MercedesDRS.png"))
-                elif car == Williams:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"WilliamsDRS.png"))
-                elif car == VCARB:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"VCARBDRS.png"))
-                elif car == AstonMartin:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"AstonMartinDRS.png"))
-                elif car == Haas:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"HaasDRS.png"))
-                elif car == Alpine:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"AlpineDRS.png"))
-                elif car == Sauber:
-                    carDRS = pygame.image.load(os.path.join(script_dir,"SauberDRS.png"))
-                DRS = True
-            else:
-                DRS = False   
+            toggleDRS()
         if ev.key == pygame.K_UP and gear != 8:
             gear += 1
 
@@ -367,8 +408,25 @@ while True:
 
         if ev.key == pygame.K_UP or ev.key == pygame.K_DOWN:
             maxSpeed = (carMaxSpeed-8) + gear
+    
+    if ev.type == pygame.JOYBUTTONDOWN:
+        if ev.button == 0:  
+            toggleDRS()
+
+        elif ev.button == 6 and gear != 8:
+            gear += 1
+
+        elif ev.button == 7 and gear != 1:
+            gear -= 1
+
+        if ev.button == 6 or ev.button == 7:
+            maxSpeed = (carMaxSpeed-8) + gear
                
     if gamestate == "start":
+    
+        if controller and lightsOut and tyresintact:
+            angle -= (joystick.get_axis(0) * turn_speed)
+
         if currentTrack == bahrainTrack:
             if racingLine:
                 screen.blit(bahrainTrackLine, (trackX,trackY))
@@ -460,9 +518,10 @@ while True:
         if lightsOut and speed > 0:
             if keys[pygame.K_a]:
                 if FLTW < 70:
-                    angle+=1.5
+                    turn_speed = 1.5
                 else:
-                    angle+=3
+                    turn_speed = 3
+                angle+=turn_speed
                 if speed > 0:
                     FLTW -= 0.001
 
@@ -485,14 +544,14 @@ while True:
         if -6347.0 < (trackY + yTravelled) < 0:
             trackY += yTravelled
 
-        if keys[pygame.K_s]:
+        if (keys[pygame.K_w] or joystick.get_button(4)):
             if speed > 0:
                 speed -= 0.1
         
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             tyresintact = False
 
-        if keys[pygame.K_w] and lightsOut and tyresintact and speed >= 0:
+        if ((keys[pygame.K_w] or joystick.get_button(5)) or joystick.get_button(5)) and lightsOut and tyresintact and speed >= 0:
             if speed < maxSpeed:
                 speed += 0.1
             if RRTW >= 0 and RLTW >= 0:
@@ -521,7 +580,7 @@ while True:
 
         if tyresintact and lightsOut:
             if DRS:
-                if keys[pygame.K_w] and speed < maxSpeed +5:
+                if (keys[pygame.K_w] or joystick.get_button(5)) and speed < maxSpeed +5:
                     speed += 0.2
             else:
                 if speed > maxSpeed:
@@ -669,7 +728,6 @@ while True:
 
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             gamestate = "crash"
-    
 
 
     mouseX, mouseY = pygame.mouse.get_pos()
@@ -807,7 +865,8 @@ while True:
         if racingLine:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
-
+    
+    print(angle)
     pygame.display.flip()
     clock.tick(60)
 
