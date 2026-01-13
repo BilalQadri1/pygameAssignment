@@ -257,7 +257,22 @@ while True:
                     trackX = -7270.0
                     trackY = -5668.0
                     angle = -39
+                    lightSound.set_volume(100)
                     lightSound.play() 
+                    lap = 0
+                    lap1time = 0
+                    lap2time = 0
+                    lap3time = 0
+                    speed = 0
+                    lightsOut = False
+                    lights = -1
+                    FLTW = 99
+                    FRTW = 99
+                    RLTW = 99
+                    RRTW = 99
+                    tyresintact = True
+                    pendingPenalty = False
+                    TimePenalty = 0
                     time = -7
 
                 elif 30 < mouseX < 90 and 30 < mouseY < 90:
