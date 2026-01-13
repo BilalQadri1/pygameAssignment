@@ -595,8 +595,11 @@ while True:
 
         if tyresintact and lightsOut:
             if DRS:
-                if (keys[pygame.K_w] or joystick.get_button(5)) and speed < maxSpeed +5:
+                if keys[pygame.K_w] and speed < maxSpeed +5:
                     speed += 0.2
+                elif controller:
+                    if joystick.get_button(5) and speed < maxSpeed +5:
+                        speed += 0.2
             else:
                 if speed > maxSpeed:
                     speed -= 0.1
