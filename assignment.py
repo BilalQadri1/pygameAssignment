@@ -288,6 +288,12 @@ def toggleDRS():
     else:
         DRS = False   
 
+print("Use W/A/S/D or a controller to drive the car. Use UP/DOWN arrow keys or controller buttons to change gears. Press SPACE to toggle DRS when available. Select tracks and cars from the menu")
+speed2 = 0
+player2X = 0
+player2Y = 0
+angle2 = 0
+car2 = Mercedes
 # *********GAME LOOP**********
 while True:
     # time tracking
@@ -763,6 +769,8 @@ while True:
             else:
                 i = 0  
 
+        screen.blit(pygame.transform.rotate(car2, angle2), (trackX + player2X, trackY + player2Y))
+
         # starting lights display and mechanics and sound
         if -1 > lights <= 0:
             screen.blit(lights0, (380, 110))
@@ -945,7 +953,6 @@ while True:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
     
-    print(maxSpeed)
     pygame.display.flip()
     clock.tick(60)
 
