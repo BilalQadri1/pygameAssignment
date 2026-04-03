@@ -26,6 +26,7 @@ import pygame
 import math
 import os
 import time
+import random # Added for grid randomization
 import gif_pygame
 from network import Network  # MULTIPLAYER IMPORT
 
@@ -42,6 +43,7 @@ windowHeight = 720
 # Add these to your variable setup
 my_lobby_id = None
 my_player_index = None
+my_grid_order = [] # Used to sync the starting grid
 available_lobbies = {} # Dictionary of {ID: Count}
 
 screen = pygame.display.set_mode((windowWidth, windowHeight))
@@ -52,8 +54,7 @@ bahrainTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_
 
 bahrainMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\BahrainMinimap.png")), (256,144))
 
-# --- LIVE CHECKPOINT LISTS ---
-# Increased to 600x600 based on your track run!
+# Track-relative checkpoints (where they sit on the 12800x7200 image)
 bahrain_checkpoints = [
     pygame.Rect(6176, 6295, 600, 600),
     pygame.Rect(4646, 6271, 600, 600),
@@ -86,13 +87,28 @@ bahrain_checkpoints = [
     pygame.Rect(10110, 6195, 600, 600),
     pygame.Rect(7883, 6279, 600, 600),
 ]
-silverstone_checkpoints = []
 
 my_checkpoint_index = 0  # Which gate are we looking for next?
 
 silverstoneTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\silverstone.png")).convert(), (12800,7200))
 silverstoneTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\silverstoneLine.png")).convert_alpha(), (12800,7200))
 silverstoneMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\silverstoneMinimap.png")), (256,144))
+
+# --- STARTING GRID POSITIONS ---
+bahrain_grid = [
+    (-6550.0, -6261.0, 0),
+    (-6653.0, -6132.0, 0),
+    (-6750.0, -6254.0, 9),
+    (-6846.0, -6104.0, 9),
+    (-6959.0, -6264.0, 0),
+    (-7061.0, -6119.0, 3),
+    (-7172.0, -6241.0, 9),
+    (-7270.0, -6133.0, 0),
+    (-7379.0, -6255.0, -6),
+    (-7477.0, -6135.0, 0)
+]
+silverstone_grid = []
+# -------------------------------
 
 currentTrack = bahrainTrack
 menu = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\menu.png")), (1280,720))
@@ -132,11 +148,21 @@ treads2 = pygame.image.load(os.path.join(script_dir,r"assets\treads2.png"))
 
 #starting race lights  countdown
 # traffic light sprites
-lights0 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\lights0.png")), (520, 560))
-lights1 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\lights1.png")), (520, 560))
-lights2 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\lights2.png")), (520, 560))
-lights3 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\lights3.png")), (520, 560))
-lights4 = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\lights4.png")), (520, 560))
+lights0 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\lights0.png")), (520, 560)
+)
+lights1 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\lights1.png")), (520, 560)
+)
+lights2 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\lights2.png")), (520, 560)
+)
+lights3 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\lights3.png")), (520, 560)
+)
+lights4 = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\lights4.png")), (520, 560)
+)
 
 lights = -1
 lightsOut = False
@@ -176,10 +202,13 @@ DRS = False
 # tyre wear starting values
 FLTW = 99
 FLTWC = tyresG
+
 FRTW = 99
 FRTWC = tyresG
+
 RLTW = 99
 RLTWC = tyresG
+
 RRTW = 99
 RRTWC = tyresG
 
@@ -197,7 +226,9 @@ carSound.set_volume(0.1)
 carSound.play(-1)
 
 # crash background
-crashbg = pygame.transform.scale(pygame.image.load(os.path.join(script_dir, r"assets\crash.png")), (1280, 720))
+crashbg = pygame.transform.scale(
+    pygame.image.load(os.path.join(script_dir, r"assets\crash.png")), (1280, 720)
+)
 
 # yellow flag variables
 flag = "none"
@@ -216,6 +247,7 @@ racingLine = False
 controller = False
 turn_speed = 3
 
+
 # Pitstop reset function
 def pitstopReset():
     global FLTW, FLTWC, FRTW, FRTWC, RLTW, RLTWC, RRTW, RRTWC, tyresintact
@@ -231,9 +263,10 @@ def pitstopReset():
 
 # DRS toggle function
 def toggleDRS():
-    global DRS, carDRS, car_name
+    global DRS, carDRS, car_name  # Explicitly add car_name here
     
     if DRS == False:
+        # This ensures it uses the LATEST car_name selected in the menu
         drs_path = os.path.join(script_dir, f"assets\\{car_name}DRS.png")
         carDRS = pygame.image.load(drs_path).convert_alpha()
         DRS = True
@@ -252,8 +285,8 @@ print("Use W/A/S/D or a controller to drive the car. Use UP/DOWN arrow keys or c
 
 car2 = Mercedes  # Default opponent car sprite
 
-# MULTIPLAYER: Connect to the server before the loop starts
-n = None
+# MULTIPLAYER: Don't connect until the user wants to!
+n = None 
 
 # Car Grid definition for both selection and networking logic
 all_teams = [
@@ -275,13 +308,14 @@ while True:
 
     # time tracking
     time += clock.get_time() / 1000
+    #keyboard pressed
     keys = pygame.key.get_pressed()
-
-    # Get mouse position globally to prevent NameError
+    
     mouseX, mouseY = pygame.mouse.get_pos()
 
     # *********EVENTS**********
-    for ev in pygame.event.get():
+    for ev in pygame.event.get():    # controller toggle
+
         if ev.type == pygame.JOYDEVICEADDED:
             joystick = pygame.joystick.Joystick(ev.device_index)
             controller = True
@@ -289,8 +323,7 @@ while True:
             controller = False 
         if ev.type == pygame.QUIT: 
             break                   
-        
-        # mouse click events - using elif chain to prevent ghost clicks
+        # mouse click events
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 
                 if gamestate == "main":
@@ -308,20 +341,23 @@ while True:
                     # --- ADD THIS BACK BUTTON LOGIC ---
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
-                    # Host Button
+                    
+                    # Host Button 
                     elif 300 < mouseX < 940 and 270 < mouseY < 370: 
-                        if n is not None and n.p is not None:  # <--- UPDATED LINE
+                        if n is not None and n.p is not None:
                             reply = n.send(["CREATE", [trackX, trackY, angle, car_name, "LOBBY"]])
                             if reply:
                                 my_lobby_id, my_player_index = reply[0], reply[1]
                                 gamestate = "hostLobby"
+                                
                     # Join Button
                     elif 300 < mouseX < 940 and 430 < mouseY < 530:
-                        if n is not None and n.p is not None:  # <--- UPDATED LINE
+                        if n is not None and n.p is not None:
                             lobby_list = n.send(["GET"]) 
                             if lobby_list is not None:
                                 available_lobbies = lobby_list
                                 gamestate = "joinLobby"
+
 
                 elif gamestate == "joinLobby": 
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
@@ -346,21 +382,29 @@ while True:
                     if my_player_index == 0:
                         if 440 < mouseX < 840 and 630 < mouseY < 690:
                             
-                            # --- NEW: Check if anyone is still out on the track ---
                             can_start = True
                             if isinstance(lobby_data, list):
                                 for p in lobby_data:
-                                    # If a player exists and their status is RACING
                                     if p is not None and len(p) > 4 and p[4] == "RACING":
                                         can_start = False
                                         break
                             
-                            # Only execute start if everyone is FINISHED or in the LOBBY
                             if can_start:
                                 gamestate = "start"
-                                # Reset coordinates based on track
-                                if currentTrack == bahrainTrack: trackX, trackY, angle = -6685.0, -6261.0, 0
-                                elif currentTrack == silverstoneTrack: trackX, trackY, angle = -7270.0, -5668.0, -39
+                                
+                                # --- CALCULATE RANDOM GRID ORDER ---
+                                active_p = [i for i, p in enumerate(lobby_data) if p is not None]
+                                random.shuffle(active_p)
+                                my_grid_order = active_p
+                                
+                                # Find our own spot in the shuffled list
+                                my_pos_index = my_grid_order.index(my_player_index)
+                                
+                                # Reset coordinates based on randomized grid assignment
+                                if currentTrack == bahrainTrack and len(bahrain_grid) > my_pos_index:
+                                    trackX, trackY, angle = bahrain_grid[my_pos_index]
+                                elif currentTrack == silverstoneTrack: 
+                                    trackX, trackY, angle = -7270.0, -5668.0, -39
                                 
                                 my_checkpoint_index = 0
                                 lightSound.set_volume(1)
@@ -400,6 +444,7 @@ while True:
                                 maxSpeed = speed_map[name]
                                 carMaxSpeed = maxSpeed
 
+                # stats screen back to main menu
                 elif gamestate == "stats":
                     # PLAY AGAIN BUTTON
                     if 320 < mouseX < 620 and 600 < mouseY < 680:
@@ -430,19 +475,21 @@ while True:
                         my_lobby_id = None
                         my_player_index = None
                         taken_cars = []
-                        # -----------------------------
 
-                elif gamestate == "ChooseTrack":
+                # track selection screen
+                if gamestate == "ChooseTrack":
+                    # bahrain track selection
                     if 480 < mouseX < 835 and 50 < mouseY < 287:
                         currentTrack = bahrainTrack
                         gamestate = "start"
-                        trackX = -6685.0
-                        trackY = -6261.0
-                        angle = 0
+                        
+                        # --- SINGLE PLAYER DEFAULTS TO POLE POSITION ---
+                        trackX, trackY, angle = bahrain_grid[0]
+                        # -----------------------------------------------
+                        
                         lightSound.set_volume(100)
                         lightSound.play() 
                         lap = 0
-                        my_checkpoint_index = 0 # RESET CHECKPOINT
                         lap1time = 0
                         lap2time = 0
                         lap3time = 0
@@ -457,6 +504,7 @@ while True:
                         pendingPenalty = False
                         TimePenalty = 0
                         time = -7
+                    # silverstone track selection
                     elif 480 < mouseX < 835 and 450 < mouseY < 687:
                         currentTrack = silverstoneTrack
                         gamestate = "start"
@@ -466,7 +514,6 @@ while True:
                         lightSound.set_volume(100)
                         lightSound.play() 
                         lap = 0
-                        my_checkpoint_index = 0 # RESET CHECKPOINT
                         lap1time = 0
                         lap2time = 0
                         lap3time = 0
@@ -481,27 +528,33 @@ while True:
                         pendingPenalty = False
                         TimePenalty = 0
                         time = -7
+                    # back to main menu
                     elif 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
-
-                elif gamestate == "carSelect":
+                # car selection screen
+                # car selection screen updates
+                if gamestate == "carSelect":
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
+                        
                     elif 120 < mouseX < 305 and 20 < mouseY < 294:
                         car = Mclaren
-                        car_name = "Mclaren" 
+                        car_name = "Mclaren"  # Make sure this matches 'MclarenDRS.png'
                         carMaxSpeed = 15
                         maxSpeed = carMaxSpeed
+
                     elif 320 < mouseX < 515 and 20 < mouseY < 294:
                         car = Mercedes
-                        car_name = "Mercedes" 
+                        car_name = "Mercedes" # Make sure this matches 'MercedesDRS.png'
                         carMaxSpeed = 14.5
                         maxSpeed = carMaxSpeed
+
                     elif 520 < mouseX < 715 and 20 < mouseY < 294:
                         car = Redbull
                         car_name = "Redbull"
                         carMaxSpeed = 14
                         maxSpeed = carMaxSpeed
+                    
                     elif 720 < mouseX < 915 and 20 < mouseY < 294:
                         car = VCARB
                         car_name = "VCARB"
@@ -538,49 +591,40 @@ while True:
                         carMaxSpeed = 10.5
                         maxSpeed = carMaxSpeed
                     
-                elif gamestate == "crash" or gamestate == "settings":
+
+
+                # crash and settings screen back to main menu
+                if gamestate == "crash" or gamestate == "settings":
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
-                    # racing line toggle in settings
-                    if gamestate == "settings" and 300 < mouseX < 940 and 270 < mouseY < 370:
-                        racingLine = not racingLine
-
-        # keyboard events 
+                # racing line toggle in settings
+                if gamestate == "settings":
+                    if 300 < mouseX < 940 and 270 < mouseY < 370:
+                        if racingLine:
+                            racingLine = False
+                        else:
+                            racingLine = True
+        # keyboard events
         if ev.type == pygame.KEYDOWN:  
             if ev.key == pygame.K_SPACE:  
                 toggleDRS()
             if ev.key == pygame.K_UP and gear != 8:
                 gear += 1
+
             elif ev.key == pygame.K_DOWN and gear != 1:
                 gear -= 1
 
             if ev.key == pygame.K_UP or ev.key == pygame.K_DOWN:
                 maxSpeed = (carMaxSpeed-8) + gear
-            
-            # --- THE LIVE CHECKPOINT CREATOR TOOL ---
-            if ev.key == pygame.K_p:
-                actual_x = int(-trackX + 640)
-                actual_y = int(-trackY + 360)
-                
-                # Now creating 600x600 boxes by default!
-                new_rect = pygame.Rect(actual_x - 300, actual_y - 300, 600, 600)
-                
-                # Instantly add it to the active track's list so it draws on screen
-                if currentTrack == bahrainTrack:
-                    bahrain_checkpoints.append(new_rect)
-                elif currentTrack == silverstoneTrack:
-                    silverstone_checkpoints.append(new_rect)
-                
-                # Print the exact code to the terminal for you to copy later
-                print(f"pygame.Rect({new_rect.x}, {new_rect.y}, {new_rect.width}, {new_rect.height}),")
-            # ------------------------------------------
 
         # controller button events
         if ev.type == pygame.JOYBUTTONDOWN:
             if ev.button == 0:  
                 toggleDRS()
+
             elif ev.button == 6 and gear != 8:
                 gear += 1
+
             elif ev.button == 7 and gear != 1:
                 gear -= 1
 
@@ -596,13 +640,12 @@ while True:
         last_network_update = current_time 
 
         if n is not None and n.p is not None and my_lobby_id is not None:
-            # --- NEW STATUS LOGIC ---
             if gamestate == "start": my_status = "RACING"
             elif gamestate == "stats": my_status = "FINISHED"
             else: my_status = "LOBBY"
-            # ------------------------
             
-            lobby_data = n.send(["UPDATE", my_lobby_id, my_player_index,[trackX, trackY, angle, car_name, my_status, my_checkpoint_index, lap]])
+            # --- INCLUDE THE GRID ORDER IN THE UPDATE ---
+            lobby_data = n.send(["UPDATE", my_lobby_id, my_player_index,[trackX, trackY, angle, car_name, my_status, my_checkpoint_index, lap, my_grid_order]])
 
             if lobby_data == "SERVER_DEAD":
                 print("Connection to the server was lost!")
@@ -622,14 +665,38 @@ while True:
                 players_connected = len([p for p in lobby_data if isinstance(p, list)])
                 taken_cars = [p[3] for i, p in enumerate(lobby_data) if isinstance(p, list) and len(p) >= 4 and i != my_player_index]
                 
+                # --- ENFORCE UNIQUE CARS ---
+                if gamestate == "hostLobby":
+                    if car_name in taken_cars:
+                        for img, x, y, name in all_teams:
+                            if name not in taken_cars:
+                                car = img
+                                car_name = name
+                                speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 
+                                            'ferrari': 13, 'Williams': 12.5, 'AstonMartin': 12, 
+                                            'Haas': 11.5, 'Sauber': 11, 'Alpine': 10.5}
+                                maxSpeed = speed_map[name]
+                                carMaxSpeed = maxSpeed
+                                break 
+                # --------------------------------
+
                 # Pull clients into race
                 if gamestate == "hostLobby" and my_player_index != 0: 
                     host_data = lobby_data[0] 
-                    # Only pull if host is RACING and on Lap 0 (prevents getting sucked into ongoing races)
-                    if isinstance(host_data, list) and len(host_data) > 6 and host_data[4] == "RACING" and host_data[6] == 0:
+                    if isinstance(host_data, list) and len(host_data) > 7 and host_data[4] == "RACING" and host_data[6] == 0:
                         gamestate = "start"
-                        if currentTrack == bahrainTrack: trackX, trackY, angle = -6685.0, -6261.0, 0
-                        elif currentTrack == silverstoneTrack: trackX, trackY, angle = -7270.0, -5668.0, -39
+                        
+                        # --- RETRIEVE GRID POSITION FROM HOST ---
+                        host_grid_order = host_data[7]
+                        my_pos_index = 0
+                        if my_player_index in host_grid_order:
+                            my_pos_index = host_grid_order.index(my_player_index)
+                        
+                        if currentTrack == bahrainTrack and len(bahrain_grid) > my_pos_index:
+                            trackX, trackY, angle = bahrain_grid[my_pos_index]
+                        elif currentTrack == silverstoneTrack: 
+                            trackX, trackY, angle = -7270.0, -5668.0, -39
+                        # -----------------------------------------
                         
                         my_checkpoint_index = 0
                         lightSound.set_volume(1)
@@ -648,18 +715,17 @@ while True:
 
     # game states
     if gamestate == "start":
-        
-        # Calculate car position on the track image
+        # Calculate your car's position on the actual 12800x7200 track
         player_track_x = -trackX + 640
         player_track_y = -trackY + 360
 
-        # Select which checkpoints to use
+        # Check if you hit the NEXT checkpoint
         active_checkpoints = bahrain_checkpoints if currentTrack == bahrainTrack else silverstone_checkpoints
-        
         if active_checkpoints:
             next_gate = active_checkpoints[my_checkpoint_index]
             if next_gate.collidepoint(player_track_x, player_track_y):
                 my_checkpoint_index += 1
+                
             if my_checkpoint_index >= len(active_checkpoints):
                 my_checkpoint_index = 0
 
@@ -667,8 +733,10 @@ while True:
         if controller and lightsOut and tyresintact:
             angle -= (joystick.get_axis(0) * turn_speed)
 
+        # Create a 1280x720 camera window based on your coordinates
         camera_rect = pygame.Rect(int(-trackX), int(-trackY), windowWidth, windowHeight)
 
+        # draw track using the camera 'area'
         if currentTrack == bahrainTrack:
             if racingLine:
                 screen.blit(bahrainTrackLine, (0, 0), area=camera_rect)
@@ -733,6 +801,7 @@ while True:
                 FRTW -= int(2*speed)
                 if not pygame.mixer.music.get_busy():
                     iAmStupid.play()
+
             elif speed > 0:
                 FLTW -= int(speed)
                 FRTW -= int(speed)
@@ -742,13 +811,12 @@ while True:
         else:
             if speed < 0:
                 speed += 0.2
-        
         # pitstop zone detection
         if centerColor == (28,28,28):
             pitstop = True
+
         elif centerColor == (36,36,36):
             pitstop = False
-        
         # corner cutting penalty detection
         elif centerColor.r == 2 and centerColor.g == 96 and centerColor.b == 0:
             pendingPenalty = True
@@ -758,7 +826,6 @@ while True:
             pendingPenalty = False
 
         keys = pygame.key.get_pressed()
-        
         # turning using keyboard
         if lightsOut and speed > 0:
             if keys[pygame.K_a]:
@@ -778,18 +845,19 @@ while True:
                 if speed > 0:
                     FRTW -= 0.01
 
+        # Reference #1
         angleRadians = math.radians(angle)
         xTravelled = round(speed * math.cos(angleRadians) ,0)
         yTravelled = round(speed * -math.sin(angleRadians) ,0)
+        # End Reference #1
 
         # move track when car moves
         if -12142.0 < (trackX + xTravelled) < 0:
             trackX += xTravelled
         if -6347.0 < (trackY + yTravelled) < 0:
             trackY += yTravelled
-            
-        # ==================================================
         # --- DRAW OPPONENTS ---
+        # ==================================================
         if isinstance(lobby_data, list):
             car_images = {
                 "ferrari": ferrari, "Mclaren": Mclaren, "Mercedes": Mercedes,
@@ -799,8 +867,8 @@ while True:
             }
 
             for i, p in enumerate(lobby_data):
-                # Now checks if they are RACING or FINISHED
                 if p is not None and i != my_player_index and len(p) > 4 and p[4] in ["RACING", "FINISHED"]:
+                    
                     p_trackX, p_trackY, p_angle, p_car_name = p[0], p[1], p[2], p[3]
                     
                     opponentX_on_screen = 500 + (trackX - p_trackX)
@@ -816,7 +884,6 @@ while True:
             if joystick.get_button(4):
                 if speed > 0:
                     speed -= 0.1
-        
         #tyre wear check
         if FLTW <= 0 or FRTW <= 0 or RLTW <= 0 or RRTW <= 0:
             tyresintact = False
@@ -873,22 +940,22 @@ while True:
             else:
                 if speed > maxSpeed:
                     speed -= 0.1
-                    
         # lap complete detection
         if currentTrack == bahrainTrack:
             if (round(trackX,0)) > -6502.0 and (round(trackX,0)) < -6419.0 and trackY > -6347 and trackY < -6034 and not crossing:
                 lap += 1
                 crossing = True
+
         elif currentTrack == silverstoneTrack:
             if (round(trackX,0)) < -7166.0 and (round(trackX,0)) > -7363.0 and trackY > -5713.0 and trackY < -5461.0 and not crossing:
                 lap += 1
                 crossing = True
-                
         # lap timing
         if lap == 1:
             lap1time = round( time,2)
         elif lap == 2:
             lap2time = round(time - lap1time,2)
+
         elif lap == 3:
             lap3time =  round(time - lap2time - lap1time,2)
 
@@ -926,27 +993,34 @@ while True:
 
         if lap > 3:
             gamestate = "stats"
-            
         # penalty display
         if TimePenalty > 0:
             screen.blit(f1font2.render(("penalty: " + str(TimePenalty)), True, ("white")) , (1050, 250))
-            
         # tyre wear display
-        if FLTW > 80: FLTWC = tyresG
-        elif FLTW > 50: FLTWC = tyresY
-        else: FLTWC = tyresR
-        
-        if FRTW > 80: FRTWC = tyresG
-        elif FRTW > 50: FRTWC = tyresY
-        else: FRTWC = tyresR
-        
-        if RLTW > 80: RLTWC = tyresG
-        elif RLTW > 50: RLTWC = tyresY
-        else: RLTWC = tyresR
-        
-        if RRTW > 80: RRTWC = tyresG
-        elif RRTW > 50: RRTWC = tyresY
-        else: RRTWC = tyresR
+        if FLTW > 80:
+            FLTWC = tyresG
+        elif FLTW > 50:
+            FLTWC = tyresY
+        else:
+            FLTWC = tyresR
+        if FRTW > 80:
+            FRTWC = tyresG
+        elif FRTW > 50:
+            FRTWC = tyresY
+        else:
+            FRTWC = tyresR
+        if RLTW > 80:
+            RLTWC = tyresG
+        elif RLTW > 50:
+            RLTWC = tyresY
+        else:
+            RLTWC = tyresR
+        if RRTW > 80:
+            RRTWC = tyresG
+        elif RRTW > 50:
+            RRTWC = tyresY
+        else:
+            RRTWC = tyresR
         
         screen.blit((FLTWC), (1118, 510))
         screen.blit((FRTWC), (1200, 510))
@@ -981,11 +1055,16 @@ while True:
                 i = 0  
 
         # starting lights display and mechanics and sound
-        if -1 > lights <= 0: screen.blit(lights0, (380, 110))
-        elif 0 > lights <= 1: screen.blit(lights1, (380, 110))
-        elif 1 > lights <= 2: screen.blit(lights2, (380, 110))
-        elif 2 > lights <= 3: screen.blit(lights3, (380, 110))
-        elif 3 > lights <= 4: screen.blit(lights4, (380, 110))
+        if -1 > lights <= 0:
+            screen.blit(lights0, (380, 110))
+        elif 0 > lights <= 1:
+            screen.blit(lights1, (380, 110))
+        elif 1 > lights <= 2:
+            screen.blit(lights2, (380, 110))
+        elif 2 > lights <= 3:
+            screen.blit(lights3, (380, 110))
+        elif 3 > lights <= 4:
+            screen.blit(lights4, (380, 110))
         elif round(lights,0) >= 3:
             lightsOut = True
             
@@ -996,7 +1075,6 @@ while True:
             if not pygame.mixer.music.get_busy():
                 awayWeGo.play()
             lights = 100
-            
         # adjust car sound volume based on speed
         carSound.set_volume(speed / maxSpeed * 0.5)
 
@@ -1014,7 +1092,6 @@ while True:
         if flag == "yellow":
             screen.blit(f1font2.render("YELLOW FLAG", True, (255, 255, 0)) , (500, 600))
 
-        # ==================================================
         # ==================================================
         # --- DRAW LEADERBOARD ---
         if isinstance(lobby_data, list):
@@ -1068,12 +1145,10 @@ while True:
                 screen.blit(name_text, (start_x + 65, y_pos + 7))
 
                 # 3. Lap Info (Right aligned)
-                # Later you can replace this with actual lap times if you sync them over the network!
                 lap_text = f1font2.render(f"Lap {p_info[6]}", True, (200, 200, 200))
                 screen.blit(lap_text, (start_x + box_width - 100, y_pos + 7))
         # ==================================================
-
-
+    
     # start menu
     if gamestate == "main":
         pygame.mixer.stop()
@@ -1081,6 +1156,8 @@ while True:
         fireworks.render(screen,(0,0))
         screen.blit(f1logo, (440,100))
         
+        # Define buttons: (y_position, label, target_state)
+        # Using 120px spacing to keep things tidy
         menu_buttons = [
             (220, 'Race'), 
             (340, 'Car'), 
@@ -1089,17 +1166,21 @@ while True:
         ]
 
         for y_pos, label in menu_buttons:
+            # Check for hover
             if 300 < mouseX < 940 and y_pos < mouseY < y_pos + 100:
                 pygame.draw.rect(screen, ("white"), (300, y_pos, 640, 100), 0, 20)
             else:
                 pygame.draw.rect(screen, (220, 220, 220), (300, y_pos, 640, 100), 0, 20)
             
+            # This centers the text perfectly inside the button
             text_surf = f1font.render(label, True, ("black"))
             text_rect = text_surf.get_rect(center=(620, y_pos + 50)) 
             screen.blit(text_surf, text_rect)
 
+
     elif gamestate == "ChooseTrack":
         screen.blit(menu, (0,0))
+        # hover effects for track selection
         if 480 < mouseX < 835 and 50 < mouseY < 287:
             pygame.draw.rect(screen, ("white"), (480, 50, 355, 237),0,20)
         else:
@@ -1112,6 +1193,7 @@ while True:
 
         screen.blit(bahrainMinimap, (530,100))
         screen.blit(silverstoneMinimap, (530,500))
+        # back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
@@ -1120,7 +1202,7 @@ while True:
 
     elif gamestate == "stats":
         # final stats screen background
-        screen.blit(menu, (0,0))
+        screen.blit(stats, (0,0))
         
         # Title
         title_text = f1font.render("FINAL STANDINGS", True, ("black"))
@@ -1187,8 +1269,10 @@ while True:
         btn2_text = f1font2.render('Main Menu', True, ("black"))
         screen.blit(btn2_text, btn2_text.get_rect(center=(810, 640)))
 
+    # car selection menu
     elif gamestate == "carSelect":
         screen.blit(menu, (0,0))
+        # car selection with hover effects
         if 120 < mouseX < 305 and 20 < mouseY < 294 or car == Mclaren:
             screen.blit(pygame.transform.scale(pygame.transform.rotate(Mclaren, -90), (144, 213)), (140,40))
         else:
@@ -1230,6 +1314,7 @@ while True:
         else:
             screen.blit(pygame.transform.scale(pygame.transform.rotate(Alpine, -90), (185, 274)), (920,350))
 
+        # back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
@@ -1237,22 +1322,26 @@ while True:
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
     elif gamestate == "crash":
+        # crash screen
         screen.blit(crashbg, (0,0))
+        # back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
-        screen.blit(f1font.render("You Crashed", True, ("black")) , (480, 300))
 
+        screen.blit(f1font.render("You Crashed", True, ("black")) , (480, 300))
+    # settings menu
     elif gamestate == "settings":
         screen.blit(menu, (0,0))
+        # back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
-        
+        # racing line toggle with hover effect
         if 300 < mouseX < 940 and 270 < mouseY < 370:
             pygame.draw.rect(screen, ("white"), (300, 270, 640, 100),0,20)
         else:
@@ -1261,33 +1350,36 @@ while True:
             pygame.draw.rect(screen, ("green"), (300, 270, 640, 100),0,20)
         screen.blit(f1font.render("Racing Line", True, ("black")) , (420, 300))
 
+    # online selection menu
     elif gamestate == "onlineMenu":
         screen.blit(menu, (0,0))
+        
+        # Back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
+        # Host Button
         if 300 < mouseX < 940 and 270 < mouseY < 370:
             pygame.draw.rect(screen, ("white"), (300, 270, 640, 100), 0, 20)
         else:
             pygame.draw.rect(screen, (220, 220, 220), (300, 270, 640, 100), 0, 20)
         screen.blit(f1font.render('Host', True, ("black")), (520, 290))
 
+        # Join Button
         if 300 < mouseX < 940 and 430 < mouseY < 530:
             pygame.draw.rect(screen, ("white"), (300, 430, 640, 100), 0, 20)
         else:
             pygame.draw.rect(screen, (220, 220, 220), (300, 430, 640, 100), 0, 20)
         screen.blit(f1font.render('Join', True, ("black")), (530, 450))
 
-        # --- NEW: CONNECTION STATUS FEEDBACK ---
+        # --- CONNECTION STATUS FEEDBACK ---
         if n is None or n.p is None:
-            # Draw a red error message if disconnected
             error_msg = "ERROR: Cannot reach server. Playing Offline."
             screen.blit(f1font2.render(error_msg, True, (255, 50, 50)), (350, 600))
         else:
-            # Draw a green success message if connected
             success_msg = "Connected to Official F1 Server"
             screen.blit(f1font2.render(success_msg, True, (50, 255, 50)), (400, 600))
         # ---------------------------------------
@@ -1295,33 +1387,68 @@ while True:
     elif gamestate == "hostLobby":
         screen.blit(menu, (0,0))
         
+        # --- DRAW START BUTTON (HOST ONLY) ---
         if my_player_index == 0:
-            if 440 < mouseX < 840 and 630 < mouseY < 690:
-                pygame.draw.rect(screen, (100, 255, 100), (440, 630, 400, 60), 0, 15) 
+            
+            can_start = True
+            if isinstance(lobby_data, list):
+                for p in lobby_data:
+                    if p is not None and len(p) > 4 and p[4] == "RACING":
+                        can_start = False
+                        break
+            
+            if can_start:
+                # Normal Green Button
+                if 440 < mouseX < 840 and 630 < mouseY < 690:
+                    pygame.draw.rect(screen, (100, 255, 100), (440, 630, 400, 60), 0, 15) 
+                else:
+                    pygame.draw.rect(screen, (50, 200, 50), (440, 630, 400, 60), 0, 15) 
+                screen.blit(f1font2.render("START RACE", True, "black"), (545, 645))
             else:
-                pygame.draw.rect(screen, (50, 200, 50), (440, 630, 400, 60), 0, 15) 
-            screen.blit(f1font2.render("START RACE", True, "black"), (545, 645))
+                # Disabled Gray Button
+                pygame.draw.rect(screen, (150, 150, 150), (440, 630, 400, 60), 0, 15)
+                screen.blit(f1font2.render("WAITING ON RACERS...", True, "black"), (460, 645))
         else:
+            # Tell other players to hang tight
             screen.blit(f1font2.render("Waiting for Host to start...", True, "white"), (480, 645))
+        # ------------------------------------------
         
+        # --- DRAW LEAVE LOBBY BUTTON (Top Right) ---
         if 1050 < mouseX < 1250 and 30 < mouseY < 90:
+            # Lighter red when hovered
             pygame.draw.rect(screen, (255, 100, 100), (1050, 30, 200, 60), 0, 15) 
         else:
+            # Dark red normally
             pygame.draw.rect(screen, (200, 50, 50), (1050, 30, 200, 60), 0, 15)   
+        
         screen.blit(f1font2.render("LEAVE", True, "white"), (1100, 45))
 
+        # Dynamic Capacity Display
         pygame.draw.rect(screen, (40, 40, 40), (300, 20, 640, 80), 0, 20)
+        # Inject the my_lobby_id variable here
         cap_text = f"LOBBY #{my_lobby_id}  |  CAPACITY: {players_connected}/10"
         screen.blit(f1font2.render(cap_text, True, "white"), (420, 45))
 
+        # Car Grid with Exclusivity
+        all_teams = [
+            (Mclaren, 120, 130, 'Mclaren'), (Mercedes, 320, 130, 'Mercedes'),
+            (Redbull, 520, 130, 'Redbull'), (VCARB, 720, 130, 'VCARB'),
+            (ferrari, 920, 130, 'ferrari'), (Williams, 120, 400, 'Williams'),
+            (AstonMartin, 320, 400, 'AstonMartin'), (Haas, 520, 400, 'Haas'),
+            (Sauber, 720, 400, 'Sauber'), (Alpine, 920, 400, 'Alpine')
+        ]
+
         for img, x, y, name in all_teams:
             is_taken = name in taken_cars
+            
             if is_taken:
+                # Gray out taken cars
                 gray_car = pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274))
                 gray_car.fill((50, 50, 50), special_flags=pygame.BLEND_RGB_MULT)
                 screen.blit(gray_car, (x, y))
                 screen.blit(f1font2.render("TAKEN", True, "red"), (x + 40, y + 100))
             else:
+                # Normal selection logic
                 if x < mouseX < x + 185 and y < mouseY < y + 274 or car == img:
                     screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (144, 213)), (x + 20, y + 20))
                 else:
@@ -1329,17 +1456,21 @@ while True:
 
     elif gamestate == "joinLobby":
         screen.blit(menu, (0,0))
+        
+        # --- DRAW BACK BUTTON ---
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
+        # --- DRAW LOBBY LIST ---
         if not available_lobbies:
             screen.blit(f1font2.render("No active lobbies found. Someone must Host first!", True, "red"), (200, 300))
         else:
             y_offset = 150
             for l_id, count in available_lobbies.items():
+                # Hover effect
                 if 300 < mouseX < 940 and y_offset < mouseY < y_offset + 80:
                     pygame.draw.rect(screen, "white", (300, y_offset, 640, 80), 0, 15)
                 else:
