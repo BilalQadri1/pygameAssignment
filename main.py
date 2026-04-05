@@ -21,17 +21,169 @@ gif_pygame
 packaging
 -----------------------------------------------------------------------------
 '''
-
 import pygame
 import math
 import os
 import time
-import random # Added for grid randomization
+import random 
 import gif_pygame
-from network import Network  # MULTIPLAYER IMPORT
+import json  # <-- Make sure json is imported up here
+from network import Network  
 
+# 1. script_dir MUST be defined first
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+# 2. NOW you can put the account setup here!
+# ==========================================
+# --- ACCOUNT SYSTEM SETUP ---
+users = {}
+accounts_file = os.path.join(script_dir, "accounts.json")
+try:
+    with open(accounts_file, "r") as f:
+        users = json.load(f)
+except FileNotFoundError:
+    users = {}
+
+def save_accounts():
+    with open(accounts_file, "w") as f:
+        json.dump(users, f, indent=4)
+# --- UNLOCKED CARS SYSTEM ---
+unlocked_cars = {}
+unlocked_file = os.path.join(script_dir, "unlocked_cars.json")
+try:
+    with open(unlocked_file, "r") as f:
+        unlocked_cars = json.load(f)
+except FileNotFoundError:
+    unlocked_cars = {}
+
+def save_unlocked_cars():
+    with open(unlocked_file, "w") as f:
+        json.dump(unlocked_cars, f, indent=4)
+# ==========================================
+
+# ==========================================
+# --- POINTS SYSTEM ---
+user_points = {}
+points_file = os.path.join(script_dir, "points.json")
+try:
+    with open(points_file, "r") as f:
+        user_points = json.load(f)
+except FileNotFoundError:
+    user_points = {}
+
+def save_points():
+    with open(points_file, "w") as f:
+        json.dump(user_points, f, indent=4)
+
+points_awarded = False
+# ==========================================
+# --- ABBREVIATION SYSTEM ---
+user_abbrs = {}
+abbrs_file = os.path.join(script_dir, "abbrs.json")
+try:
+    with open(abbrs_file, "r") as f:
+        user_abbrs = json.load(f)
+except FileNotFoundError:
+    user_abbrs = {}
+
+def save_abbrs():
+    with open(abbrs_file, "w") as f:
+        json.dump(user_abbrs, f, indent=4)
+
+abbrInputed = ""
+abbrTyping = False
+# ==========================================
+# ==========================================
+# --- DRIVER INVENTORY SYSTEM ---
+owned_drivers = {}
+drivers_file = os.path.join(script_dir, "owned_drivers.json")
+try:
+    with open(drivers_file, "r") as f:
+        owned_drivers = json.load(f)
+except FileNotFoundError:
+    owned_drivers = {}
+
+def save_drivers():
+    with open(drivers_file, "w") as f:
+        json.dump(owned_drivers, f, indent=4)
+
+market_search_input = ""
+market_typing = False
+market_results = []       
+market_selected = None    
+market_loaded_img = None  
+market_msg = ""
+
+# --- NEW: Inventory Variables ---
+inventory_page = 0
+inventory_loaded_imgs = {}
+# --------------------------------
+# --- DYNAMIC PRICING ---
+DRIVER_PRICES = {
+    "Verstappen": 2500, "Hamilton": 2000, "Leclerc": 1800, "Norris": 1500, 
+    "Alonso": 1200, "Piastri": 1200, "Russell": 1100, "Sainz": 1100, "Perez": 800
+}
+DEFAULT_F1_PRICE = 500
+TIER_PRICES = {"F2": 200, "F3": 100, "F4": 50}
+
+# --- ADD THIS FUNCTION BACK IN ---
+def find_driver_card(name):
+    base_dir = os.path.join(script_dir, "F1Cards")
+    sub_dirs = ["", "F2", "F3", "F4"]
+    for sub in sub_dirs:
+        path = os.path.join(base_dir, sub, f"{name}.png")
+        if os.path.exists(path):
+            return path
+    return None
+# ---------------------------------
+
+def search_driver_cards(query):
+    if not query: return []
+    
+    base_dir = os.path.join(script_dir, "F1Cards")
+    sub_dirs = ["", "F2", "F3", "F4"]
+    results = []
+    query_lower = query.lower()
+    
+    for sub in sub_dirs:
+        folder_path = os.path.join(base_dir, sub)
+        if not os.path.exists(folder_path): continue
+        
+        for file in os.listdir(folder_path):
+            if file.endswith(".png") and query_lower in file.lower():
+                name = file.replace(".png", "")
+                
+                # Ignore utility assets
+                if name in ["Empty", "GoldTemplate", "pack"]: continue
+                
+                # Determine Price
+                price = DEFAULT_F1_PRICE
+                if sub in TIER_PRICES: price = TIER_PRICES[sub]
+                
+                # Override with specific F1 price if they are a top driver
+                for key, val in DRIVER_PRICES.items():
+                    if key.lower() in name.lower():
+                        price = val
+                        break
+                        
+                results.append({"name": name, "path": os.path.join(folder_path, file), "price": price})
+    
+    return results[:6] # Return max 6 results to fit on screen
+# ==========================================
+
+loggedInUser = None
+typing = False
+UsernameTyping = False
+passwordTyping = False
+UsernameInputed = ""
+passwordInputed = ""
+UsernameExist = False
+passwordExist = False
+show_last_char = False
+last_key_time = 0
+# ==========================================
+
+# 3. The rest of your normal setup continues below...
 pygame.init()
 pygame.joystick.init()
 
@@ -133,8 +285,8 @@ Haas = pygame.image.load(os.path.join(script_dir, r"assets\Haas.png")).convert_a
 Alpine = pygame.image.load(os.path.join(script_dir, r"assets\Alpine.png")).convert_alpha()
 Sauber = pygame.image.load(os.path.join(script_dir, r"assets\Sauber.png")).convert_alpha()
 
-car = ferrari
-car_name = "ferrari"
+car = Alpine
+car_name = "Alpine"
 
 #tyres wear colors
 tyresG = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\tyresG.png")), (60.5,90.5))
@@ -324,18 +476,165 @@ while True:
         if ev.type == pygame.QUIT: 
             break                   
         # mouse click events
+        # mouse click events
         if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
                 
                 if gamestate == "main":
                     if 300 < mouseX < 940:
-                        if 220 < mouseY < 320: gamestate = "ChooseTrack"
-                        elif 340 < mouseY < 440: gamestate = "carSelect"
-                        elif 460 < mouseY < 560: gamestate = "settings"
-                        elif 580 < mouseY < 680: 
-                            gamestate = "onlineMenu"
-                            # Force a reconnection attempt if it previously failed!
-                            if n is None or n.p is None:
-                                n = Network()
+                        # --- UPDATED: 4-Button Layout with Market ---
+                        if 220 < mouseY < 320: # RACE
+                            if loggedInUser: gamestate = "carSelect" 
+                        elif 340 < mouseY < 440: # MARKET
+                            if loggedInUser: 
+                                gamestate = "market"
+                                market_search_input, market_msg, market_searched_img = "", "", None
+                        elif 460 < mouseY < 560: # SETTINGS
+                            gamestate = "settings"
+                        elif 580 < mouseY < 680: # ONLINE
+                            if loggedInUser:
+                                gamestate = "onlineMenu"
+                                if n is None or n.p is None: n = Network()
+                        # --------------------------------------------
+                        
+                    # Account Button Click (Top Right)
+                    elif 1050 < mouseX < 1250 and 30 < mouseY < 90:
+                        gamestate = "accountMenu" if loggedInUser else "authMenu"
+
+                # --- UPDATED: Market Screen Clicks ---
+                elif gamestate == "market":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "main"
+                        market_typing = False
+                    
+                    # Search Box Click
+                    elif 300 < mouseX < 760 and 150 < mouseY < 230:
+                        market_typing = True
+                    else:
+                        market_typing = False
+
+                    # Click on a live search result
+                    list_y = 250
+                    for res in market_results:
+                        if 300 < mouseX < 760 and list_y < mouseY < list_y + 50:
+                            market_selected = res
+                            market_msg = ""
+                            try:
+                                loaded = pygame.image.load(res["path"]).convert_alpha()
+                                # --- UPDATED: Fixed aspect ratio to 228x300 ---
+                                market_loaded_img = pygame.transform.scale(loaded, (228, 300))
+                            except:
+                                market_loaded_img = None
+                        list_y += 60
+
+                    # Purchase Button Click
+                    if market_selected and market_loaded_img and 800 < mouseX < 1000 and 600 < mouseY < 660:
+                        my_pts = user_points.get(loggedInUser, 0)
+                        my_drivers = owned_drivers.get(loggedInUser, [])
+                        card_name = market_selected["name"]
+                        card_price = market_selected["price"]
+                        
+                        if card_name in my_drivers:
+                            market_msg = "You already own this driver!"
+                        elif my_pts >= card_price:
+                            user_points[loggedInUser] -= card_price
+                            save_points()
+                            my_drivers.append(card_name)
+                            owned_drivers[loggedInUser] = my_drivers
+                            save_drivers()
+                            market_msg = f"Purchased {card_name}!"
+                        else:
+                            market_msg = f"Need {card_price - my_pts} more PTS."
+
+                # --- NEW: Authentication Selection Menu ---
+                elif gamestate == "authMenu":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "main"
+                    elif 300 < mouseX < 940 and 270 < mouseY < 370: # Sign Up
+                        gamestate = "signUp"
+                        UsernameInputed, passwordInputed = "", ""
+                        typing = False
+                    elif 300 < mouseX < 940 and 430 < mouseY < 530: # Sign In
+                        gamestate = "signIn"
+                        UsernameInputed, passwordInputed = "", ""
+                        typing = False
+
+                # --- NEW: Sign Up & Sign In Menus ---
+                elif gamestate == "signUp" or gamestate == "signIn":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "authMenu"
+                        typing = False
+                    
+                    # Input boxes selection (Adjusted heights to fit 3 boxes)
+                    elif 300 < mouseX < 940 and 150 < mouseY < 230:
+                        typing, UsernameTyping, passwordTyping, abbrTyping = True, True, False, False
+                    elif 300 < mouseX < 940 and 260 < mouseY < 340:
+                        typing, passwordTyping, UsernameTyping, abbrTyping = True, True, False, False
+                    elif gamestate == "signUp" and 300 < mouseX < 940 and 370 < mouseY < 450:
+                        typing, abbrTyping, UsernameTyping, passwordTyping = True, True, False, False
+                    else:
+                        typing = False
+
+                    # Submit Buttons
+                    if 440 < mouseX < 840 and 480 < mouseY < 560:
+                        if gamestate == "signUp":
+                            # Require exactly 3 letters for the tag
+                            if not UsernameExist and UsernameInputed != "" and passwordInputed != "" and len(abbrInputed) == 3:
+                                users[UsernameInputed] = passwordInputed
+                                save_accounts()
+                                
+                                # Save the 3-letter tag
+                                user_abbrs[UsernameInputed] = abbrInputed.upper()
+                                save_abbrs()
+                                
+                                if UsernameInputed not in unlocked_cars:
+                                    unlocked_cars[UsernameInputed] = ["Alpine"]
+                                    save_unlocked_cars()
+                                
+                                loggedInUser = UsernameInputed
+                                gamestate = "main"
+                                
+                        elif gamestate == "signIn":
+                            if UsernameInputed in users and users[UsernameInputed] == passwordInputed:
+                                loggedInUser = UsernameInputed
+                                gamestate = "main"
+
+                # --- Account Info Menu Clicks ---
+                elif gamestate == "accountMenu":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "main"
+                    elif 440 < mouseX < 840 and 550 < mouseY < 630: # Sign Out Button
+                        loggedInUser = None
+                        gamestate = "main"
+                        
+                    # --- NEW: View Cards Button Click ---
+                    elif 750 < mouseX < 1150 and 280 < mouseY < 360:
+                        gamestate = "inventory"
+                        inventory_page = 0
+                        # Pre-load the card images so the grid is fast!
+                        my_drivers = owned_drivers.get(loggedInUser, [])
+                        for drv in my_drivers:
+                            if drv not in inventory_loaded_imgs:
+                                path = find_driver_card(drv)
+                                if path:
+                                    try:
+                                        img = pygame.image.load(path).convert_alpha()
+                                        # Scale for grid (190x250) keeps the aspect ratio
+                                        inventory_loaded_imgs[drv] = pygame.transform.scale(img, (190, 250)) 
+                                    except: pass
+
+                # --- NEW: Inventory Screen Clicks ---
+                elif gamestate == "inventory":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "accountMenu"
+                        
+                    my_drivers = owned_drivers.get(loggedInUser, [])
+                    max_pages = max(0, (len(my_drivers) - 1) // 8)
+                    
+                    # Pagination Clicks
+                    if 50 < mouseX < 150 and 330 < mouseY < 390 and inventory_page > 0:
+                        inventory_page -= 1
+                    elif 1130 < mouseX < 1230 and 330 < mouseY < 390 and inventory_page < max_pages:
+                        inventory_page += 1
 
                 elif gamestate == "onlineMenu": 
                     # --- ADD THIS BACK BUTTON LOGIC ---
@@ -382,12 +681,18 @@ while True:
                     if my_player_index == 0:
                         if 440 < mouseX < 840 and 630 < mouseY < 690:
                             
-                            can_start = True
+                            # --- UPDATED: Require at least 2 players to start ---
+                            can_start = False
                             if isinstance(lobby_data, list):
-                                for p in lobby_data:
-                                    if p is not None and len(p) > 4 and p[4] == "RACING":
-                                        can_start = False
-                                        break
+                                active_players = [p for p in lobby_data if p is not None]
+                                if len(active_players) >= 2:
+                                    can_start = True
+                                    # Ensure no one is currently stuck in a racing state
+                                    for p in active_players:
+                                        if len(p) > 4 and p[4] == "RACING":
+                                            can_start = False
+                                            break
+                            # ----------------------------------------------------
                             
                             if can_start:
                                 gamestate = "start"
@@ -411,6 +716,7 @@ while True:
                                 lightSound.play() 
                                 time = -7
                                 lap = 0
+                                points_awarded = False
                                 lap1time, lap2time, lap3time = 0, 0, 0
                                 speed = 0
                                 lightsOut = False
@@ -432,9 +738,12 @@ while True:
                         gamestate = "onlineMenu"
 
                     # CAR SELECTION GRID LOGIC
+                    my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
+                    
                     for img, x, y, name in all_teams:
                         if x < mouseX < x + 185 and y < mouseY < y + 274:
-                            if name not in taken_cars:
+                            # --- UPDATED: Allow selection if it's unlocked AND (not taken OR is Alpine) ---
+                            if (name not in taken_cars or name == "Alpine") and name in my_unlocked:
                                 car = img
                                 car_name = name 
                                 
@@ -451,6 +760,7 @@ while True:
                         # Go to lobby if online, or track select if offline
                         gamestate = "hostLobby" if my_lobby_id is not None else "ChooseTrack"
                         lap = 0
+                        points_awarded = False
                         lap1time, lap2time, lap3time = 0, 0, 0
                         speed = 0
                         lightsOut = False
@@ -466,6 +776,7 @@ while True:
                     elif 660 < mouseX < 960 and 600 < mouseY < 680:
                         gamestate = "main"
                         lap = 0
+                        points_awarded = False
                         lap1time, lap2time, lap3time = 0, 0, 0
                         speed = 0
                         lightsOut = False
@@ -490,6 +801,7 @@ while True:
                         lightSound.set_volume(100)
                         lightSound.play() 
                         lap = 0
+                        points_awarded = False
                         lap1time = 0
                         lap2time = 0
                         lap3time = 0
@@ -514,6 +826,7 @@ while True:
                         lightSound.set_volume(100)
                         lightSound.play() 
                         lap = 0
+                        points_awarded = False
                         lap1time = 0
                         lap2time = 0
                         lap3time = 0
@@ -531,65 +844,34 @@ while True:
                     # back to main menu
                     elif 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
-                # car selection screen
                 # car selection screen updates
                 if gamestate == "carSelect":
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
+                    # --- NEW: Confirm Button Click (Goes to Choose Track) ---
+                    elif 1050 < mouseX < 1250 and 600 < mouseY < 680:
+                        gamestate = "ChooseTrack"
+                    # --------------------------------------------------------
+                    else:
+                        # --- REFACTORED CAR CLICK LOGIC ---
+                        car_select_grid = [
+                            (Mclaren, 120, 20, "Mclaren", 15), (Mercedes, 320, 20, "Mercedes", 14.5),
+                            (Redbull, 520, 20, "Redbull", 14), (VCARB, 720, 20, "VCARB", 13.5),
+                            (ferrari, 920, 20, "ferrari", 13), (Williams, 120, 350, "Williams", 12.5),
+                            (AstonMartin, 320, 350, "AstonMartin", 12), (Haas, 520, 350, "Haas", 11.5),
+                            (Sauber, 720, 350, "Sauber", 11), (Alpine, 920, 350, "Alpine", 10.5)
+                        ]
                         
-                    elif 120 < mouseX < 305 and 20 < mouseY < 294:
-                        car = Mclaren
-                        car_name = "Mclaren"  # Make sure this matches 'MclarenDRS.png'
-                        carMaxSpeed = 15
-                        maxSpeed = carMaxSpeed
+                        # Get user's cars, default to Alpine if not logged in
+                        my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
 
-                    elif 320 < mouseX < 515 and 20 < mouseY < 294:
-                        car = Mercedes
-                        car_name = "Mercedes" # Make sure this matches 'MercedesDRS.png'
-                        carMaxSpeed = 14.5
-                        maxSpeed = carMaxSpeed
-
-                    elif 520 < mouseX < 715 and 20 < mouseY < 294:
-                        car = Redbull
-                        car_name = "Redbull"
-                        carMaxSpeed = 14
-                        maxSpeed = carMaxSpeed
-                    
-                    elif 720 < mouseX < 915 and 20 < mouseY < 294:
-                        car = VCARB
-                        car_name = "VCARB"
-                        carMaxSpeed = 13.5
-                        maxSpeed = carMaxSpeed
-                    elif 920 < mouseX < 1115 and 20 < mouseY < 294:
-                        car = ferrari
-                        car_name = "ferrari"
-                        carMaxSpeed = 13
-                        maxSpeed = carMaxSpeed
-                    elif 120 < mouseX < 305 and 400 < mouseY < 674:
-                        car = Williams
-                        car_name = "Williams"
-                        carMaxSpeed = 12.5
-                        maxSpeed = carMaxSpeed
-                    elif 320 < mouseX < 515 and 400 < mouseY < 674:
-                        car = AstonMartin
-                        car_name = "AstonMartin"
-                        carMaxSpeed = 12
-                        maxSpeed = carMaxSpeed
-                    elif 520 < mouseX < 715 and 400 < mouseY < 674:
-                        car = Haas
-                        car_name = "Haas"
-                        carMaxSpeed = 11.5
-                        maxSpeed = carMaxSpeed 
-                    elif 720 < mouseX < 915 and 400 < mouseY < 674:
-                        car = Sauber
-                        car_name = "Sauber"
-                        carMaxSpeed = 11
-                        maxSpeed = carMaxSpeed
-                    elif 920 < mouseX < 1115 and 400 < mouseY < 674:
-                        car = Alpine
-                        car_name = "Alpine"
-                        carMaxSpeed = 10.5
-                        maxSpeed = carMaxSpeed
+                        for img, x, y, name, speed_val in car_select_grid:
+                            if x < mouseX < x + 185 and y < mouseY < y + 274:
+                                if name in my_unlocked: # Only equip if unlocked!
+                                    car = img
+                                    car_name = name
+                                    carMaxSpeed = speed_val
+                                    maxSpeed = carMaxSpeed
                     
 
 
@@ -606,6 +888,44 @@ while True:
                             racingLine = True
         # keyboard events
         if ev.type == pygame.KEYDOWN:  
+            
+            # --- NEW: Typing Logic ---
+            if typing and (gamestate == "signUp" or gamestate == "signIn"):
+                if ev.key == pygame.K_BACKSPACE:
+                    if UsernameTyping: UsernameInputed = UsernameInputed[:-1]
+                    if passwordTyping: passwordInputed = passwordInputed[:-1]
+                    if abbrTyping: abbrInputed = abbrInputed[:-1]
+                elif ev.key == pygame.K_RETURN:
+                    typing = False
+                elif ev.key != pygame.K_SPACE:
+                    if UsernameTyping and len(UsernameInputed) <= 17: UsernameInputed += ev.unicode
+                    if passwordTyping and len(passwordInputed) <= 17:
+                        passwordInputed += ev.unicode
+                        last_key_time = pygame.time.get_ticks()
+                        show_last_char = True
+                    
+                    # Limit tag to 3 alphabetical characters and force uppercase
+                    if abbrTyping and len(abbrInputed) < 3 and ev.unicode.isalpha():
+                        abbrInputed += ev.unicode.upper()
+
+                UsernameExist = UsernameInputed in users
+
+            # --- UPDATED: Market Typing (Live Search) ---
+            if market_typing and gamestate == "market":
+                if ev.key == pygame.K_BACKSPACE:
+                    market_search_input = market_search_input[:-1]
+                elif ev.key == pygame.K_RETURN:
+                    market_typing = False
+                else:
+                    if len(market_search_input) <= 20 and (ev.unicode.isalpha() or ev.key == pygame.K_SPACE):
+                        market_search_input += ev.unicode
+                
+                # Trigger live search on every keystroke
+                market_results = search_driver_cards(market_search_input)
+                market_selected = None # Clear selection when typing
+                market_msg = ""
+
+            # ... Your existing KEYDOWN events (DRS, Gears) continue below ...
             if ev.key == pygame.K_SPACE:  
                 toggleDRS()
             if ev.key == pygame.K_UP and gear != 8:
@@ -643,9 +963,11 @@ while True:
             if gamestate == "start": my_status = "RACING"
             elif gamestate == "stats": my_status = "FINISHED"
             else: my_status = "LOBBY"
+            # Get your custom tag, default to "PLY" if something goes wrong
+            my_abbr = user_abbrs.get(loggedInUser, "PLY") if loggedInUser else "GUE"
             
-            # --- INCLUDE THE GRID ORDER IN THE UPDATE ---
-            lobby_data = n.send(["UPDATE", my_lobby_id, my_player_index,[trackX, trackY, angle, car_name, my_status, my_checkpoint_index, lap, my_grid_order]])
+            # INCLUDE THE GRID ORDER AND ABBREVIATION IN THE UPDATE
+            lobby_data = n.send(["UPDATE", my_lobby_id, my_player_index,[trackX, trackY, angle, car_name, my_status, my_checkpoint_index, lap, my_grid_order, my_abbr]])
 
             if lobby_data == "SERVER_DEAD":
                 print("Connection to the server was lost!")
@@ -665,11 +987,15 @@ while True:
                 players_connected = len([p for p in lobby_data if isinstance(p, list)])
                 taken_cars = [p[3] for i, p in enumerate(lobby_data) if isinstance(p, list) and len(p) >= 4 and i != my_player_index]
                 
-                # --- ENFORCE UNIQUE CARS ---
+                # --- ENFORCE UNIQUE AND UNLOCKED CARS ---
                 if gamestate == "hostLobby":
-                    if car_name in taken_cars:
+                    my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
+                    
+                    # UPDATED: Ignore if our current car is Alpine, otherwise check if it was taken
+                    if (car_name in taken_cars and car_name != "Alpine") or car_name not in my_unlocked:
                         for img, x, y, name in all_teams:
-                            if name not in taken_cars:
+                            # UPDATED: Auto-equip the first available car (Alpine is always available)
+                            if (name not in taken_cars or name == "Alpine") and name in my_unlocked:
                                 car = img
                                 car_name = name
                                 speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 
@@ -703,6 +1029,8 @@ while True:
                         lightSound.play() 
                         time = -7
                         lap = 0
+                        points_awarded = False # <-- ADD THIS LINE
+                        lap1time = 0
                         speed = 0
                         lightsOut = False
                         lights = -1
@@ -1140,7 +1468,7 @@ while True:
                 pygame.draw.rect(screen, (20, 20, 20), (start_x + 50, y_pos, box_width - 50, row_height - 2))
                 
                 # Draw Team Name (Abbreviated to 3 uppercase letters just like F1!)
-                team_abbr = p_info[3][:3].upper()
+                team_abbr = p_info[8] if len(p_info) > 8 else p_info[3][:3].upper()
                 name_text = f1font2.render(team_abbr, True, "white")
                 screen.blit(name_text, (start_x + 65, y_pos + 7))
 
@@ -1156,26 +1484,48 @@ while True:
         fireworks.render(screen,(0,0))
         screen.blit(f1logo, (440,100))
         
-        # Define buttons: (y_position, label, target_state)
-        # Using 120px spacing to keep things tidy
+        # --- UPDATED: Removed Car button, re-spaced the remaining 3 ---
+        # format: (y_position, label, requires_login)
         menu_buttons = [
-            (220, 'Race'), 
-            (340, 'Car'), 
-            (460, 'Settings'), 
-            (580, 'Online')
+            (220, 'Race', True), 
+            (340, 'Market', True), 
+            (460, 'Settings', False), 
+            (580, 'Online', True)
         ]
+        # --------------------------------------------------------------
 
-        for y_pos, label in menu_buttons:
-            # Check for hover
-            if 300 < mouseX < 940 and y_pos < mouseY < y_pos + 100:
-                pygame.draw.rect(screen, ("white"), (300, y_pos, 640, 100), 0, 20)
-            else:
-                pygame.draw.rect(screen, (220, 220, 220), (300, y_pos, 640, 100), 0, 20)
+        for y_pos, label, requires_login in menu_buttons:
+            # Check if this specific button should be locked
+            is_disabled = requires_login and not loggedInUser
             
-            # This centers the text perfectly inside the button
-            text_surf = f1font.render(label, True, ("black"))
+            if is_disabled:
+                # Draw dark grey locked button
+                pygame.draw.rect(screen, (100, 100, 100), (300, y_pos, 640, 100), 0, 20)
+                text_surf = f1font.render(label, True, (150, 150, 150))
+                
+                # Optional: Add a little lock icon/text indicator
+                screen.blit(f1font2.render("LOCKED", True, (200, 50, 50)), (320, y_pos + 35))
+            else:
+                # Normal hover and draw logic
+                if 300 < mouseX < 940 and y_pos < mouseY < y_pos + 100:
+                    pygame.draw.rect(screen, ("white"), (300, y_pos, 640, 100), 0, 20)
+                else:
+                    pygame.draw.rect(screen, (220, 220, 220), (300, y_pos, 640, 100), 0, 20)
+                text_surf = f1font.render(label, True, ("black"))
+            
+            # Center the text perfectly
             text_rect = text_surf.get_rect(center=(620, y_pos + 50)) 
             screen.blit(text_surf, text_rect)
+
+        # Draw Account Button in Main Menu
+        if 1050 < mouseX < 1250 and 30 < mouseY < 90:
+            pygame.draw.rect(screen, ("white"), (1050, 30, 200, 60), 0, 15)
+        else:
+            pygame.draw.rect(screen, (220, 220, 220), (1050, 30, 200, 60), 0, 15)
+        
+        acc_label = loggedInUser if loggedInUser else "Account"
+        acc_surf = f1font2.render(acc_label[:10], True, "black")
+        screen.blit(acc_surf, acc_surf.get_rect(center=(1150, 60)))
 
 
     elif gamestate == "ChooseTrack":
@@ -1202,7 +1552,7 @@ while True:
 
     elif gamestate == "stats":
         # final stats screen background
-        screen.blit(stats, (0,0))
+        screen.blit(menu, (0,0))
         
         # Title
         title_text = f1font.render("FINAL STANDINGS", True, ("black"))
@@ -1227,6 +1577,31 @@ while True:
                 reverse=True
             )
 
+            # ==========================================
+            # --- NEW: AWARD POINTS ONCE (Online Only) ---
+            if not points_awarded and loggedInUser and my_lobby_id is not None:
+                my_position = 0
+                my_data = lobby_data[my_player_index] if len(lobby_data) > my_player_index else None
+                
+                # Find where our exact data sits in the sorted leaderboard
+                if my_data:
+                    for idx, p_info in enumerate(players_ranking):
+                        if p_info == my_data:
+                            my_position = idx + 1 # 1st place is index 0
+                            break
+                
+                # Official F1 Points distribution
+                points_map = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+                earned_points = points_map.get(my_position, 0)
+                
+                if earned_points > 0:
+                    current_points = user_points.get(loggedInUser, 0)
+                    user_points[loggedInUser] = current_points + earned_points
+                    save_points()
+                
+                points_awarded = True # Lock it so we don't award points again!
+            # ==========================================
+
             start_x = 340
             start_y = 120
             row_height = 45
@@ -1243,8 +1618,19 @@ while True:
 
                 # Name Plate
                 pygame.draw.rect(screen, (20, 20, 20), (start_x + 50, y_pos, box_width - 50, row_height - 2))
-                team_abbr = p_info[3][:3].upper()
+                team_abbr = p_info[8] if len(p_info) > 8 else p_info[3][:3].upper()
                 screen.blit(f1font2.render(team_abbr, True, "white"), (start_x + 65, y_pos + 7))
+
+                # --- NEW: Display Points Earned ---
+                points_map = {1: 25, 2: 18, 3: 15, 4: 12, 5: 10, 6: 8, 7: 6, 8: 4, 9: 2, 10: 1}
+                earned_pts = points_map.get(idx + 1, 0)
+                
+                # Only show points if they actually finished the race (Lap > 3)
+                if p_info[6] > 3 and earned_pts > 0:
+                    pts_text = f"+{earned_pts} PTS"
+                    # Draw in gold color, perfectly spaced between the name and the status
+                    screen.blit(f1font2.render(pts_text, True, (255, 215, 0)), (start_x + box_width - 280, y_pos + 7))
+                # ----------------------------------
 
                 # Status (Check if they finished lap 3)
                 status_text = "FINISHED" if p_info[6] > 3 else f"Lap {p_info[6]}"
@@ -1269,57 +1655,100 @@ while True:
         btn2_text = f1font2.render('Main Menu', True, ("black"))
         screen.blit(btn2_text, btn2_text.get_rect(center=(810, 640)))
 
-    # car selection menu
     elif gamestate == "carSelect":
         screen.blit(menu, (0,0))
-        # car selection with hover effects
-        if 120 < mouseX < 305 and 20 < mouseY < 294 or car == Mclaren:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mclaren, -90), (144, 213)), (140,40))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mclaren, -90), (185, 274)), (120,20))
-        if 320 < mouseX < 515 and 20 < mouseY < 294 or car == Mercedes:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mercedes, -90), (144, 213)), (340,40))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Mercedes, -90), (185, 274)), (320,20))
-        if 520 < mouseX < 715 and 20 < mouseY < 294 or car == Redbull:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Redbull, -90), (144, 213)), (540,40))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Redbull, -90), (185, 274)), (520,20))
-        if 720 < mouseX < 915 and 20 < mouseY < 294 or car == VCARB:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(VCARB, -90), (144, 213)), (740,40))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(VCARB, -90), (185, 274)), (720,20))
-        if 920 < mouseX < 1115 and 20 < mouseY < 294 or car == ferrari:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(ferrari, -90), (144, 213)), (940,40))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(ferrari, -90), (185, 274)), (920,20))
-        if 120 < mouseX < 305 and 350 < mouseY < 624 or car == Williams:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Williams, -90), (144, 213)), (140,370))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Williams, -90), (185, 274)), (120,350))
-        if 320 < mouseX < 515 and 350 < mouseY < 624 or car == AstonMartin:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(AstonMartin, -90 ), (144, 213)), (340,370))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(AstonMartin, -90 ), (185, 274)), (320,350))
-        if 520 < mouseX < 715 and 350 < mouseY < 624 or car == Haas:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Haas, -90), (144, 213)), (540,370))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Haas, -90), (185, 274)), (520,350))
-        if 720 < mouseX < 915 and 350 < mouseY < 624 or car == Sauber:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Sauber, -90), (144, 213)), (740,370))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Sauber, -90), (185, 274)), (720,350))
-        if 920 < mouseX < 1115 and 350 < mouseY < 624 or car == Alpine:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Alpine, -90), (144, 213)), (940,370))
-        else:
-            screen.blit(pygame.transform.scale(pygame.transform.rotate(Alpine, -90), (185, 274)), (920,350))
-
+        
         # back button
         if 30 < mouseX < 90 and 30 < mouseY < 90:
             pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else:
             pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        # --- NEW: Draw Confirm Button ---
+        if 1050 < mouseX < 1250 and 600 < mouseY < 680:
+            pygame.draw.rect(screen, (100, 255, 100), (1050, 600, 200, 80), 0, 15)
+        else:
+            pygame.draw.rect(screen, (50, 200, 50), (1050, 600, 200, 80), 0, 15)
+        
+        conf_text = f1font2.render("CONFIRM", True, "black")
+        screen.blit(conf_text, conf_text.get_rect(center=(1150, 640)))
+        # --------------------------------
+
+        # --- REFACTORED CAR DRAWING WITH LOCKS ---
+        car_select_grid = [
+            (Mclaren, 120, 20, "Mclaren"), (Mercedes, 320, 20, "Mercedes"),
+            (Redbull, 520, 20, "Redbull"), (VCARB, 720, 20, "VCARB"),
+            (ferrari, 920, 20, "ferrari"), (Williams, 120, 350, "Williams"),
+            (AstonMartin, 320, 350, "AstonMartin"), (Haas, 520, 350, "Haas"),
+            (Sauber, 720, 350, "Sauber"), (Alpine, 920, 350, "Alpine")
+        ]
+
+        my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
+
+        for img, x, y, name in car_select_grid:
+            is_hovered = x < mouseX < x + 185 and y < mouseY < y + 274
+            
+            if name not in my_unlocked:
+                # Draw Gray Locked Car
+                gray_car = pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274))
+                gray_car.fill((50, 50, 50), special_flags=pygame.BLEND_RGB_MULT)
+                screen.blit(gray_car, (x, y))
+                screen.blit(f1font2.render("LOCKED", True, "red"), (x + 35, y + 120))
+            else:
+                # Draw Normal Unlocked Car
+                if is_hovered or car == img:
+                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (144, 213)), (x + 20, y + 20))
+                else:
+                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274)), (x, y))
+    # --- UPDATED: Market Screen Visuals ---
+    elif gamestate == "market":
+        screen.blit(menu, (0,0))
+        
+        # Back button
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        # Title & Points
+        screen.blit(f1font.render("Driver Market", True, ("white")), (450, 60))
+        my_pts = user_points.get(loggedInUser, 0)
+        screen.blit(f1font2.render(f"Balance: {my_pts} PTS", True, (255, 215, 0)), (950, 60))
+
+        # Search Box (Left Side)
+        pygame.draw.rect(screen, "white", (300, 150, 460, 80), 0, 15)
+        if market_typing: pygame.draw.rect(screen, (100, 200, 255), (300, 150, 460, 80), 5, 15)
+        s_text = f1font.render(market_search_input if market_search_input else "Search Driver...", True, (0,0,0) if market_search_input else (150,150,150))
+        screen.blit(s_text, (320, 165))
+
+        # Draw Live Search Results
+        list_y = 250
+        for res in market_results:
+            # Hover effect
+            if 300 < mouseX < 760 and list_y < mouseY < list_y + 50:
+                pygame.draw.rect(screen, (200, 200, 200), (300, list_y, 460, 50), 0, 10)
+            else:
+                pygame.draw.rect(screen, (50, 50, 50), (300, list_y, 460, 50), 0, 10)
+            
+            # Name and Price
+            screen.blit(f1font2.render(res["name"], True, "white"), (310, list_y + 10))
+            screen.blit(f1font2.render(f"{res['price']} PTS", True, (255, 215, 0)), (620, list_y + 10))
+            list_y += 60
+
+        # Draw Selected Card Preview (Right Side)
+        if market_selected and market_loaded_img:
+            # Draw Card
+            screen.blit(market_loaded_img, (800, 280))
+            
+            # Draw Purchase Button
+            if 800 < mouseX < 1000 and 600 < mouseY < 660: pygame.draw.rect(screen, (100, 255, 100), (800, 600, 200, 60), 0, 15)
+            else: pygame.draw.rect(screen, (50, 200, 50), (800, 600, 200, 60), 0, 15)
+            screen.blit(f1font2.render(f"BUY ({market_selected['price']})", True, "black"), (820, 615))
+
+        # Status Message
+        if market_msg:
+            msg_color = (100, 255, 100) if "Purchased" in market_msg else (255, 100, 100)
+            screen.blit(f1font2.render(market_msg, True, msg_color), (450, 200 if not market_selected else 620))
 
     elif gamestate == "crash":
         # crash screen
@@ -1390,12 +1819,19 @@ while True:
         # --- DRAW START BUTTON (HOST ONLY) ---
         if my_player_index == 0:
             
-            can_start = True
+            # --- UPDATED: Require at least 2 players to draw the green button ---
+            can_start = False
+            active_count = 0
             if isinstance(lobby_data, list):
-                for p in lobby_data:
-                    if p is not None and len(p) > 4 and p[4] == "RACING":
-                        can_start = False
-                        break
+                active_players = [p for p in lobby_data if p is not None]
+                active_count = len(active_players)
+                if active_count >= 2:
+                    can_start = True
+                    for p in active_players:
+                        if len(p) > 4 and p[4] == "RACING":
+                            can_start = False
+                            break
+            # --------------------------------------------------------------------
             
             if can_start:
                 # Normal Green Button
@@ -1407,7 +1843,16 @@ while True:
             else:
                 # Disabled Gray Button
                 pygame.draw.rect(screen, (150, 150, 150), (440, 630, 400, 60), 0, 15)
-                screen.blit(f1font2.render("WAITING ON RACERS...", True, "black"), (460, 645))
+                
+                # Contextual text so the host knows what they are waiting for
+                if active_count < 2:
+                    btn_text = "NEED MORE PLAYERS"
+                    text_x = 480
+                else:
+                    btn_text = "WAITING ON RACERS..."
+                    text_x = 460
+                    
+                screen.blit(f1font2.render(btn_text, True, "black"), (text_x, 645))
         else:
             # Tell other players to hang tight
             screen.blit(f1font2.render("Waiting for Host to start...", True, "white"), (480, 645))
@@ -1429,7 +1874,7 @@ while True:
         cap_text = f"LOBBY #{my_lobby_id}  |  CAPACITY: {players_connected}/10"
         screen.blit(f1font2.render(cap_text, True, "white"), (420, 45))
 
-        # Car Grid with Exclusivity
+        # Car Grid with Exclusivity AND Locks
         all_teams = [
             (Mclaren, 120, 130, 'Mclaren'), (Mercedes, 320, 130, 'Mercedes'),
             (Redbull, 520, 130, 'Redbull'), (VCARB, 720, 130, 'VCARB'),
@@ -1438,22 +1883,28 @@ while True:
             (Sauber, 720, 400, 'Sauber'), (Alpine, 920, 400, 'Alpine')
         ]
 
+        my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
+
         for img, x, y, name in all_teams:
-            is_taken = name in taken_cars
+            # --- UPDATED: Alpine is never considered "taken" visually ---
+            is_taken = name in taken_cars and name != "Alpine"
+            is_locked = name not in my_unlocked
             
-            if is_taken:
-                # Gray out taken cars
+            if is_taken or is_locked:
+                # Gray out taken OR locked cars
                 gray_car = pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274))
                 gray_car.fill((50, 50, 50), special_flags=pygame.BLEND_RGB_MULT)
                 screen.blit(gray_car, (x, y))
-                screen.blit(f1font2.render("TAKEN", True, "red"), (x + 40, y + 100))
+                
+                # Show appropriate label based on why they can't pick it
+                label_text = "TAKEN" if is_taken else "LOCKED"
+                screen.blit(f1font2.render(label_text, True, "red"), (x + 35, y + 100))
             else:
-                # Normal selection logic
+                # Normal selection logic for available & unlocked cars
                 if x < mouseX < x + 185 and y < mouseY < y + 274 or car == img:
                     screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (144, 213)), (x + 20, y + 20))
                 else:
                     screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274)), (x, y))
-
     elif gamestate == "joinLobby":
         screen.blit(menu, (0,0))
         
@@ -1479,6 +1930,187 @@ while True:
                 txt = f"Lobby #{l_id}  -  Capacity: {count}/10"
                 screen.blit(f1font2.render(txt, True, "black"), (350, y_offset + 25))
                 y_offset += 100
+
+    # --- NEW: Authentication Selection Screen ---
+    elif gamestate == "authMenu":
+        screen.blit(menu, (0,0))
+        
+        # Back button
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        # Sign Up Button
+        if 300 < mouseX < 940 and 270 < mouseY < 370: pygame.draw.rect(screen, ("white"), (300, 270, 640, 100), 0, 20)
+        else: pygame.draw.rect(screen, (220, 220, 220), (300, 270, 640, 100), 0, 20)
+        screen.blit(f1font.render('Create Account', True, ("black")), (390, 290))
+
+        # Sign In Button
+        if 300 < mouseX < 940 and 430 < mouseY < 530: pygame.draw.rect(screen, ("white"), (300, 430, 640, 100), 0, 20)
+        else: pygame.draw.rect(screen, (220, 220, 220), (300, 430, 640, 100), 0, 20)
+        screen.blit(f1font.render('Sign In', True, ("black")), (520, 450))
+
+    # --- NEW: Sign Up and Sign In Screens ---
+    elif gamestate in ["signUp", "signIn"]:
+        screen.blit(menu, (0,0))
+        
+        # Back button
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        title_text = "Sign Up" if gamestate == "signUp" else "Sign In"
+        screen.blit(f1font.render(title_text, True, ("white")), (530, 60))
+
+        # Username Box
+        pygame.draw.rect(screen, "white", (300, 150, 640, 80), 0, 15)
+        if typing and UsernameTyping: pygame.draw.rect(screen, (100, 200, 255), (300, 150, 640, 80), 5, 15)
+        
+        if gamestate == "signUp" and UsernameExist and UsernameInputed != "":
+            pygame.draw.rect(screen, "red", (300, 150, 640, 80), 5, 15)
+            screen.blit(f1font2.render("Username Already Exists", True, "red") , (310, 120))
+        elif gamestate == "signIn" and not UsernameExist and UsernameInputed != "":
+            pygame.draw.rect(screen, "red", (300, 150, 640, 80), 5, 15)
+            screen.blit(f1font2.render("Username Does Not Exist", True, "red") , (310, 120))
+
+        u_text = f1font.render(UsernameInputed if UsernameInputed else "Username", True, (0,0,0) if UsernameInputed else (150,150,150))
+        screen.blit(u_text, (330, 170))
+
+        # Password Box
+        pygame.draw.rect(screen, "white", (300, 260, 640, 80), 0, 15)
+        if typing and passwordTyping: pygame.draw.rect(screen, (100, 200, 255), (300, 260, 640, 80), 5, 15)
+        
+        if show_last_char and (pygame.time.get_ticks() - last_key_time) < 1000:
+            p_disp = "●"*(len(passwordInputed)-1) + passwordInputed[-1:]
+        else:
+            p_disp = "●" * len(passwordInputed)
+            show_last_char = False
+
+        p_text = f1font.render(p_disp if passwordInputed else "Password", True, (0,0,0) if passwordInputed else (150,150,150))
+        screen.blit(p_text, (330, 280))
+
+        if gamestate == "signIn" and passwordInputed != "":
+            if not (UsernameInputed in users and users[UsernameInputed] == passwordInputed):
+                pygame.draw.rect(screen, "red", (300, 260, 640, 80), 5, 15)
+
+        # Abbreviation Box (Sign Up Only)
+        if gamestate == "signUp":
+            pygame.draw.rect(screen, "white", (300, 370, 640, 80), 0, 15)
+            if typing and abbrTyping: pygame.draw.rect(screen, (100, 200, 255), (300, 370, 640, 80), 5, 15)
+            
+            if abbrInputed != "" and len(abbrInputed) < 3:
+                pygame.draw.rect(screen, "red", (300, 370, 640, 80), 5, 15)
+                screen.blit(f1font2.render("Must be exactly 3 letters", True, "red") , (310, 455))
+                
+            a_text = f1font.render(abbrInputed if abbrInputed else "3-Letter Tag", True, (0,0,0) if abbrInputed else (150,150,150))
+            screen.blit(a_text, (330, 390))
+
+        # Submit Button
+        if 440 < mouseX < 840 and 480 < mouseY < 560: pygame.draw.rect(screen, ("white"), (440, 480, 400, 80), 0, 15)
+        else: pygame.draw.rect(screen, (220, 220, 220), (440, 480, 400, 80), 0, 15)
+        btn_text = "Create Account" if gamestate == "signUp" else "Login"
+        screen.blit(f1font.render(btn_text, True, ("black")), (500 if gamestate=="signUp" else 550, 495))
+
+    # --- NEW: Account Info Menu (When Logged In) ---
+    elif gamestate == "accountMenu":
+        screen.blit(menu, (0,0))
+        
+        # Back button
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        screen.blit(f1font.render("Account Profile", True, ("white")), (430, 100))
+        screen.blit(f1font2.render(f"Logged in as: {loggedInUser}", True, ("white")), (430, 180))
+
+        # --- NEW: Display Total Points ---
+        my_points = user_points.get(loggedInUser, 0)
+        screen.blit(f1font2.render(f"Career Points: {my_points}", True, (255, 215, 0)), (430, 220)) # Drawn in Gold
+        # ---------------------------------
+
+        # Display Unlocked Cars 
+        my_cars = unlocked_cars.get(loggedInUser, ["Alpine"])
+        screen.blit(f1font2.render(f"Your Garage:", True, ("white")), (430, 280))
+
+        # --- UPDATED: Replace Text List with 'View Cards' Button ---
+        if 750 < mouseX < 1150 and 280 < mouseY < 360: 
+            pygame.draw.rect(screen, (100, 200, 255), (750, 280, 400, 80), 0, 15)
+        else: 
+            pygame.draw.rect(screen, "white", (750, 280, 400, 80), 0, 15)
+        screen.blit(f1font.render("View My Cards", True, "black"), (790, 295))
+        # -----------------------------------------------------------
+        my_drivers = owned_drivers.get(loggedInUser, [])
+        screen.blit(f1font2.render(f"Driver Roster:", True, ("white")), (750, 280))
+        
+        y_offset_drv = 320 
+        for driver in my_drivers[-8:]: # Only show the 8 most recent to save screen space
+            screen.blit(f1font2.render(f"- {driver}", True, (100, 255, 255)), (770, y_offset_drv))
+            y_offset_drv += 35
+        
+        y_offset = 320 # Pushed down slightly to make room for points
+        for unlocked_car in my_cars:
+            screen.blit(f1font2.render(f"- {unlocked_car}", True, (100, 255, 100)), (450, y_offset))
+            y_offset += 35
+
+        # Sign Out Button
+        if 440 < mouseX < 840 and 550 < mouseY < 630: pygame.draw.rect(screen, (255, 100, 100), (440, 550, 400, 80), 0, 15)
+        else: pygame.draw.rect(screen, (200, 50, 50), (440, 550, 400, 80), 0, 15)
+        screen.blit(f1font.render('Sign Out', True, ("white")), (520, 560))
+    
+    # --- NEW: Inventory / Owned Cards Screen Visuals ---
+    elif gamestate == "inventory":
+        screen.blit(menu, (0,0))
+        
+        # Back button
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
+
+        screen.blit(f1font.render("My Card Collection", True, ("white")), (400, 40))
+
+        my_drivers = owned_drivers.get(loggedInUser, [])
+        max_pages = max(0, (len(my_drivers) - 1) // 8)
+
+        if len(my_drivers) == 0:
+            screen.blit(f1font2.render("You don't own any drivers yet! Go to the Market.", True, "red"), (350, 300))
+        else:
+            screen.blit(f1font2.render(f"Page {inventory_page + 1} / {max_pages + 1}", True, "white"), (560, 100))
+
+            # Draw Grid (4 columns, 2 rows)
+            start_x = 200
+            start_y = 150
+            x_spacing = 220
+            y_spacing = 270
+
+            start_idx = inventory_page * 8
+            end_idx = min(start_idx + 8, len(my_drivers))
+
+            for i in range(start_idx, end_idx):
+                drv = my_drivers[i]
+                row = (i - start_idx) // 4
+                col = (i - start_idx) % 4
+                
+                draw_x = start_x + (col * x_spacing)
+                draw_y = start_y + (row * y_spacing)
+                
+                if drv in inventory_loaded_imgs:
+                    # Adds a clean white border behind the card
+                    pygame.draw.rect(screen, "white", (draw_x-3, draw_y-3, 196, 256), 0, 10)
+                    screen.blit(inventory_loaded_imgs[drv], (draw_x, draw_y))
+                else:
+                    pygame.draw.rect(screen, (50,50,50), (draw_x, draw_y, 190, 250), 0, 10)
+                    screen.blit(f1font2.render("Loading...", True, "white"), (draw_x + 20, draw_y + 100))
+
+            # Draw Pagination Buttons
+            if inventory_page > 0:
+                if 50 < mouseX < 150 and 330 < mouseY < 390: pygame.draw.rect(screen, (200, 200, 200), (50, 330, 100, 60), 0, 15)
+                else: pygame.draw.rect(screen, "white", (50, 330, 100, 60), 0, 15)
+                screen.blit(f1font2.render("PREV", True, "black"), (65, 345))
+
+            if inventory_page < max_pages:
+                if 1130 < mouseX < 1230 and 330 < mouseY < 390: pygame.draw.rect(screen, (200, 200, 200), (1130, 330, 100, 60), 0, 15)
+                else: pygame.draw.rect(screen, "white", (1130, 330, 100, 60), 0, 15)
+                screen.blit(f1font2.render("NEXT", True, "black"), (1145, 345))
 
     pygame.display.flip()
     clock.tick(60)
