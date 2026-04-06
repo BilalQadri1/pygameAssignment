@@ -1,8 +1,9 @@
 {
     "a": {
         "Cadillac": "Hamilton2019",
-        "Audi": "Cadillac",
-        "Alpine": "Ricciardo",
-        "ferrari": "None"
+        "Audi": "Ricciardo",
+        "Alpine": "None",
+        "ferrari": "None",
+        "Mercedes": "HamiltonMercedes"
     }
 }
