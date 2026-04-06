@@ -118,13 +118,49 @@ market_msg = ""
 inventory_page = 0
 inventory_loaded_imgs = {}
 # --------------------------------
+# ==========================================
+# --- ACTIVE SQUAD SYSTEM ---
+active_driver = {}
+active_driver_file = os.path.join(script_dir, "active_driver.json")
+try:
+    with open(active_driver_file, "r") as f:
+        active_driver = json.load(f)
+except FileNotFoundError:
+    active_driver = {}
+
+def save_active_driver():
+    with open(active_driver_file, "w") as f:
+        json.dump(active_driver, f, indent=4)
+# ==========================================
 # --- DYNAMIC PRICING ---
 DRIVER_PRICES = {
-    "Verstappen": 2500, "Hamilton": 2000, "Leclerc": 1800, "Norris": 1500, 
-    "Alonso": 1200, "Piastri": 1200, "Russell": 1100, "Sainz": 1100, "Perez": 800
+    # Primes & Legends
+    "Hamilton2019": 3500, "Vettel": 3500, "HamiltonMercedes": 3000, 
+    "HamiltonMclaren": 2800, "Rosberg": 2500, "Ricciardo": 2000, 
+    "Bottas2019": 1800, "Bottas2020": 1800, "SainzFerrari": 1500, "VettelAston": 1200,
+    
+    # Current Top Tier
+    "Verstappen": 3000, "Norris": 2500, "Leclerc": 2200, "Hamilton": 2000, 
+    "Piastri": 1800, "Sainz": 1600, "Russell": 1600, "Alonso": 1500, 
+    
+    # Midfield / Rookies
+    "Hulkenberg": 1000, "Albon": 1000, "Gasly": 900, "Perez": 900, 
+    "Ocon": 800, "Tsunoda": 800, "Colapinto": 1000, "Antonelli": 1200, # High hype rookie tax
+    "Bearman": 900, "Lawson": 900, "Bortoleto": 800, "Hadjar": 800,
+    "Ricciardo2024": 800, "Magnussen": 700, "Bottas2024": 700,
+    
+    # Lower F1 / Ex-F1
+    "Guanyu": 600, "MickSchumacher": 600, "De Vries": 500, "Sargeant": 400,
+
+    # Teams
+    "Redbull": 5000, "Mclaren": 4800, "ferrari": 4500, "Mercedes": 4000, 
+    "AstonMartin": 2500, "Alpine": 2000, "Haas": 2000, "VCARB": 1800, 
+    "Williams": 1500, "Cadillac": 1200, "Audi": 1000
 }
 DEFAULT_F1_PRICE = 500
-TIER_PRICES = {"F2": 200, "F3": 100, "F4": 50}
+TIER_PRICES = {"F2": 200, "F3": 100, "F4": 50} # Your F2/F3/F4 cards will auto-use these!
+
+# ==========================================
 
 # --- ADD THIS FUNCTION BACK IN ---
 def find_driver_card(name):
@@ -136,6 +172,55 @@ def find_driver_card(name):
             return path
     return None
 # ---------------------------------
+
+
+def draw_card_stats(surface, driver_name, card_x, card_y):
+    # --- BULLETPROOF DICTIONARY MATCHING ---
+    # 1. Strip ALL spaces and make the requested name lowercase
+    clean_name = driver_name.replace(" ", "").lower()
+    
+    # 2. Strip ALL spaces and make the dictionary keys lowercase
+    bulletproof_stats = {k.replace(" ", "").lower(): v for k, v in driver_stats.items()}
+    
+    # 3. Look it up!
+    stats = bulletproof_stats.get(clean_name, {"OVR": 75, "EXP": 75, "RAC": 75, "AWA": 75, "PAC": 75})
+    # ---------------------------------------
+    
+    # Your perfectly calibrated coordinates!
+    positions = {
+        "OVR": (card_x + 30, card_y + 73),
+        "EXP": (card_x + 21, card_y + 236),
+        "RAC": (card_x + 69, card_y + 235),
+        "AWA": (card_x + 115, card_y + 235),
+        "PAC": (card_x + 163, card_y + 235),
+    }
+
+    # ... (Keep the rest of the loop exactly the same below this!) ...
+
+
+    for stat_name, position in positions.items():
+        val_str = str(int(stats[stat_name])).zfill(2) # Turns '8' into '08'
+        x_offset = 0
+        
+        # Draw each digit side-by-side
+        for digit in val_str:
+            if digit in rating_images:
+                surface.blit(rating_images[digit], (position[0] + x_offset, position[1]))
+                x_offset += 22 # Shift right for the second digit (slightly wider than the 20px width)
+# ==========================================
+def get_boosted_speed(base_speed, driver_name):
+    if not driver_name: return base_speed
+    
+    clean_name = driver_name.replace(" ", "").lower()
+    bulletproof_stats = {k.replace(" ", "").lower(): v for k, v in driver_stats.items()}
+    stats = bulletproof_stats.get(clean_name, {"PAC": 75})
+    pace = stats["PAC"]
+    
+    # 75 Pace is baseline. Every point above/below adds/subtracts 0.1 maxSpeed
+    boost = (pace - 75) * 0.1 
+    
+    # Hard floor of 5.0 so a terrible driver doesn't make the car go backwards!
+    return max(5.0, base_speed + boost)
 
 def search_driver_cards(query):
     if not query: return []
@@ -205,7 +290,186 @@ bahrainTrack = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,
 bahrainTrackLine = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\bahrainLine.png")).convert_alpha(), (12800,7200))
 
 bahrainMinimap = pygame.transform.scale(pygame.image.load(os.path.join(script_dir,r"assets\BahrainMinimap.png")), (256,144))
+# ==========================================
+# ==========================================
+# --- DRIVER RATINGS SYSTEM ---
+ovr_images = {}
+stat_images = {}
 
+OVR_W, OVR_H = 30, 30    
+STAT_W, STAT_H = 18, 18  
+
+for i in range(10):
+    num_path = os.path.join(script_dir, "F1Cards", "RatingNumbers", f"{i}.png")
+    if os.path.exists(num_path):
+        img = pygame.image.load(num_path).convert_alpha()
+        ovr_images[str(i)] = pygame.transform.scale(img, (OVR_W, OVR_H))
+        stat_images[str(i)] = pygame.transform.scale(img, (STAT_W, STAT_H))
+
+# Current Live Stats 
+driver_stats = {
+    # --- HISTORICAL / PRIME F1 ---
+    "Hamilton2019":     {"OVR": 97, "EXP": 95, "RAC": 98, "AWA": 96, "PAC": 98},
+    "Vettel":           {"OVR": 96, "EXP": 90, "RAC": 95, "AWA": 94, "PAC": 99}, 
+    "HamiltonMercedes": {"OVR": 95, "EXP": 99, "RAC": 96, "AWA": 97, "PAC": 94},
+    "HamiltonMclaren":  {"OVR": 94, "EXP": 75, "RAC": 94, "AWA": 85, "PAC": 98},
+    "Rosberg":          {"OVR": 91, "EXP": 88, "RAC": 90, "AWA": 92, "PAC": 93},
+    "Ricciardo":        {"OVR": 90, "EXP": 85, "RAC": 95, "AWA": 88, "PAC": 90}, 
+    "Bottas2020":       {"OVR": 89, "EXP": 85, "RAC": 87, "AWA": 88, "PAC": 92},
+    "SainzFerrari":     {"OVR": 89, "EXP": 82, "RAC": 89, "AWA": 92, "PAC": 88},
+    "Bottas2019":       {"OVR": 88, "EXP": 80, "RAC": 86, "AWA": 86, "PAC": 91},
+    "VettelAston":      {"OVR": 86, "EXP": 99, "RAC": 85, "AWA": 95, "PAC": 80},
+
+    # --- CURRENT F1 GRID ---
+    "Verstappen": {"OVR": 96, "EXP": 88, "RAC": 97, "AWA": 95, "PAC": 98},
+    "Norris":     {"OVR": 93, "EXP": 80, "RAC": 92, "AWA": 88, "PAC": 95},
+    "Leclerc":    {"OVR": 92, "EXP": 82, "RAC": 91, "AWA": 89, "PAC": 96},
+    "Hamilton":   {"OVR": 91, "EXP": 99, "RAC": 92, "AWA": 95, "PAC": 91},
+    "Piastri":    {"OVR": 90, "EXP": 65, "RAC": 90, "AWA": 86, "PAC": 92},
+    "Sainz":      {"OVR": 89, "EXP": 84, "RAC": 90, "AWA": 92, "PAC": 88},
+    "Russell":    {"OVR": 89, "EXP": 78, "RAC": 89, "AWA": 88, "PAC": 91},
+    "Alonso":     {"OVR": 88, "EXP": 99, "RAC": 94, "AWA": 96, "PAC": 85},
+    "Hulkenberg": {"OVR": 85, "EXP": 92, "RAC": 84, "AWA": 88, "PAC": 85},
+    "Albon":      {"OVR": 85, "EXP": 76, "RAC": 84, "AWA": 86, "PAC": 86},
+    "Gasly":      {"OVR": 84, "EXP": 82, "RAC": 84, "AWA": 85, "PAC": 84},
+    "Perez":      {"OVR": 84, "EXP": 90, "RAC": 83, "AWA": 82, "PAC": 85},
+    "Ocon":       {"OVR": 83, "EXP": 83, "RAC": 85, "AWA": 80, "PAC": 84},
+    "Tsunoda":    {"OVR": 83, "EXP": 74, "RAC": 82, "AWA": 78, "PAC": 85},
+    "Ricciardo2024":{"OVR":81, "EXP": 95, "RAC": 80, "AWA": 82, "PAC": 80},
+    "Magnussen":  {"OVR": 80, "EXP": 88, "RAC": 85, "AWA": 75, "PAC": 80},
+    "Bottas2024": {"OVR": 80, "EXP": 92, "RAC": 79, "AWA": 84, "PAC": 78},
+    "Guanyu":     {"OVR": 78, "EXP": 70, "RAC": 78, "AWA": 76, "PAC": 77},
+    "MickSchumacher":{"OVR":77, "EXP": 60, "RAC": 76, "AWA": 75, "PAC": 78},
+    "De Vries":   {"OVR": 76, "EXP": 50, "RAC": 75, "AWA": 77, "PAC": 75},
+    "Sargeant":   {"OVR": 75, "EXP": 55, "RAC": 74, "AWA": 72, "PAC": 78},
+    "Pearce":     {"OVR": 65, "EXP": 40, "RAC": 64, "AWA": 65, "PAC": 66}, 
+    "Hayes":      {"OVR": 64, "EXP": 35, "RAC": 65, "AWA": 62, "PAC": 65}, 
+
+    # --- 2025 ROOKIES ---
+    "Antonelli":  {"OVR": 81, "EXP": 30, "RAC": 80, "AWA": 75, "PAC": 86},
+    "Bearman":    {"OVR": 81, "EXP": 45, "RAC": 82, "AWA": 80, "PAC": 82},
+    "Colapinto":  {"OVR": 81, "EXP": 40, "RAC": 83, "AWA": 78, "PAC": 82},
+    "Lawson":     {"OVR": 80, "EXP": 45, "RAC": 81, "AWA": 79, "PAC": 81},
+    "Bortoleto":  {"OVR": 79, "EXP": 35, "RAC": 80, "AWA": 78, "PAC": 81},
+    "Hadjar":     {"OVR": 79, "EXP": 35, "RAC": 82, "AWA": 75, "PAC": 82},
+
+    # --- F2 DRIVERS (70-78 Range) ---
+    "Mini":         {"OVR": 78, "EXP": 30, "RAC": 77, "AWA": 76, "PAC": 80},
+    "Lindblad":     {"OVR": 78, "EXP": 20, "RAC": 76, "AWA": 74, "PAC": 82},
+    "Fornaroli":    {"OVR": 77, "EXP": 35, "RAC": 79, "AWA": 80, "PAC": 76},
+    "Browning":     {"OVR": 77, "EXP": 30, "RAC": 78, "AWA": 76, "PAC": 78},
+    "Beganovic":    {"OVR": 76, "EXP": 30, "RAC": 75, "AWA": 75, "PAC": 78},
+    "Martins":      {"OVR": 76, "EXP": 45, "RAC": 74, "AWA": 72, "PAC": 79},
+    "Maini":        {"OVR": 75, "EXP": 40, "RAC": 75, "AWA": 74, "PAC": 76},
+    "Crawford":     {"OVR": 75, "EXP": 45, "RAC": 76, "AWA": 75, "PAC": 75},
+    "Verschoor":    {"OVR": 74, "EXP": 60, "RAC": 75, "AWA": 78, "PAC": 72},
+    "Miyata":       {"OVR": 74, "EXP": 50, "RAC": 74, "AWA": 76, "PAC": 73},
+    "Marti":        {"OVR": 73, "EXP": 30, "RAC": 72, "AWA": 70, "PAC": 76},
+    "Dunne":        {"OVR": 73, "EXP": 25, "RAC": 75, "AWA": 71, "PAC": 75},
+    "Goethe":       {"OVR": 72, "EXP": 30, "RAC": 71, "AWA": 73, "PAC": 73},
+    "arthurLeclerc":{"OVR": 72, "EXP": 45, "RAC": 70, "AWA": 72, "PAC": 74},
+    "Meguetounif":  {"OVR": 71, "EXP": 25, "RAC": 72, "AWA": 69, "PAC": 73},
+    "Montoya":      {"OVR": 71, "EXP": 25, "RAC": 70, "AWA": 71, "PAC": 72},
+    "Stanek":       {"OVR": 70, "EXP": 40, "RAC": 71, "AWA": 72, "PAC": 69},
+    "Cordeel":      {"OVR": 70, "EXP": 45, "RAC": 68, "AWA": 70, "PAC": 70},
+    "Esterson":     {"OVR": 69, "EXP": 20, "RAC": 69, "AWA": 68, "PAC": 70},
+    "Shields":      {"OVR": 68, "EXP": 20, "RAC": 68, "AWA": 67, "PAC": 69},
+
+    # --- F3 DRIVERS (60-69 Range) ---
+    "Tramnitz":       {"OVR": 69, "EXP": 25, "RAC": 68, "AWA": 67, "PAC": 71},
+    "Tsolov":         {"OVR": 68, "EXP": 25, "RAC": 69, "AWA": 65, "PAC": 70},
+    "Taponen":        {"OVR": 68, "EXP": 15, "RAC": 67, "AWA": 66, "PAC": 72},
+    "Stenshorne":     {"OVR": 68, "EXP": 20, "RAC": 68, "AWA": 67, "PAC": 69},
+    "Câmara":         {"OVR": 67, "EXP": 15, "RAC": 66, "AWA": 65, "PAC": 70},
+    "Boyo":           {"OVR": 67, "EXP": 25, "RAC": 67, "AWA": 68, "PAC": 66}, 
+    "Boya":           {"OVR": 67, "EXP": 25, "RAC": 67, "AWA": 68, "PAC": 66},
+    "Leon":           {"OVR": 66, "EXP": 20, "RAC": 65, "AWA": 67, "PAC": 66}, 
+    "León":           {"OVR": 66, "EXP": 20, "RAC": 65, "AWA": 67, "PAC": 66},
+    "Ugochukwu":      {"OVR": 66, "EXP": 15, "RAC": 64, "AWA": 63, "PAC": 69},
+    "Voisin":         {"OVR": 66, "EXP": 20, "RAC": 66, "AWA": 68, "PAC": 65},
+    "Strømsted":      {"OVR": 65, "EXP": 15, "RAC": 65, "AWA": 64, "PAC": 67},
+    "Wharton":        {"OVR": 65, "EXP": 15, "RAC": 64, "AWA": 63, "PAC": 68},
+    "Ramos":          {"OVR": 64, "EXP": 20, "RAC": 64, "AWA": 65, "PAC": 63},
+    "Wurz":           {"OVR": 64, "EXP": 20, "RAC": 63, "AWA": 64, "PAC": 65},
+    "Pino":           {"OVR": 63, "EXP": 15, "RAC": 64, "AWA": 62, "PAC": 64},
+    "Naël":           {"OVR": 63, "EXP": 15, "RAC": 62, "AWA": 63, "PAC": 65},
+    "Badoer":         {"OVR": 63, "EXP": 10, "RAC": 62, "AWA": 61, "PAC": 66},
+    "Giusti":         {"OVR": 62, "EXP": 15, "RAC": 63, "AWA": 62, "PAC": 63},
+    "Hoepen":         {"OVR": 62, "EXP": 20, "RAC": 61, "AWA": 64, "PAC": 62},
+    "Zagazeta":       {"OVR": 62, "EXP": 20, "RAC": 62, "AWA": 60, "PAC": 63},
+    "Bilinski":       {"OVR": 61, "EXP": 15, "RAC": 61, "AWA": 62, "PAC": 62},
+    "Domingues":      {"OVR": 61, "EXP": 15, "RAC": 60, "AWA": 61, "PAC": 63},
+    "Sharp":          {"OVR": 61, "EXP": 10, "RAC": 61, "AWA": 60, "PAC": 62},
+    "Inthraphuvasak": {"OVR": 60, "EXP": 15, "RAC": 60, "AWA": 59, "PAC": 61},
+    "Benavides":      {"OVR": 60, "EXP": 15, "RAC": 59, "AWA": 60, "PAC": 60},
+    "Marinangeli":    {"OVR": 60, "EXP": 10, "RAC": 59, "AWA": 58, "PAC": 62},
+    "Lacorte":        {"OVR": 59, "EXP": 10, "RAC": 58, "AWA": 59, "PAC": 60},
+    "Johnson":        {"OVR": 59, "EXP": 10, "RAC": 59, "AWA": 58, "PAC": 59},
+    "Xie":            {"OVR": 58, "EXP": 10, "RAC": 57, "AWA": 58, "PAC": 59},
+    "Ho":             {"OVR": 58, "EXP": 10, "RAC": 58, "AWA": 57, "PAC": 58},
+    "Hedley":         {"OVR": 58, "EXP": 10, "RAC": 57, "AWA": 56, "PAC": 59},
+
+    # --- F4 DRIVERS (50-59 Range) ---
+    "Nakamura":    {"OVR": 59, "EXP": 5, "RAC": 58, "AWA": 57, "PAC": 62},
+    "Slater":      {"OVR": 58, "EXP": 10, "RAC": 57, "AWA": 58, "PAC": 60}, 
+    "Saeter":      {"OVR": 58, "EXP": 10, "RAC": 57, "AWA": 58, "PAC": 60},
+    "Gomez":       {"OVR": 57, "EXP": 5, "RAC": 56, "AWA": 55, "PAC": 60},
+    "Bondarev":    {"OVR": 56, "EXP": 5, "RAC": 55, "AWA": 56, "PAC": 58},
+    "Consani":     {"OVR": 56, "EXP": 5, "RAC": 56, "AWA": 54, "PAC": 57},
+    "Olivieri":    {"OVR": 55, "EXP": 5, "RAC": 54, "AWA": 55, "PAC": 56},
+    "Wheldon":     {"OVR": 55, "EXP": 5, "RAC": 55, "AWA": 54, "PAC": 56},
+    "Hanna":       {"OVR": 54, "EXP": 5, "RAC": 53, "AWA": 55, "PAC": 55},
+    "Popov":       {"OVR": 54, "EXP": 5, "RAC": 54, "AWA": 53, "PAC": 55},
+    "Vinci":       {"OVR": 53, "EXP": 5, "RAC": 52, "AWA": 52, "PAC": 54},
+    "Severiukhin": {"OVR": 53, "EXP": 5, "RAC": 53, "AWA": 51, "PAC": 54},
+    "Chi":         {"OVR": 52, "EXP": 5, "RAC": 51, "AWA": 52, "PAC": 53},
+
+    # --- ALL 11 TEAMS ---
+    "Mclaren":     {"OVR": 95, "EXP": 90, "RAC": 92, "AWA": 88, "PAC": 98},
+    "ferrari":     {"OVR": 93, "EXP": 99, "RAC": 91, "AWA": 85, "PAC": 95},
+    "Redbull":     {"OVR": 92, "EXP": 95, "RAC": 94, "AWA": 92, "PAC": 92},
+    "Mercedes":    {"OVR": 90, "EXP": 96, "RAC": 90, "AWA": 92, "PAC": 90},
+    "AstonMartin": {"OVR": 83, "EXP": 85, "RAC": 82, "AWA": 84, "PAC": 82},
+    "Alpine":      {"OVR": 82, "EXP": 90, "RAC": 81, "AWA": 76, "PAC": 83},
+    "Haas":        {"OVR": 82, "EXP": 75, "RAC": 83, "AWA": 84, "PAC": 81},
+    "VCARB":       {"OVR": 81, "EXP": 80, "RAC": 82, "AWA": 80, "PAC": 82},
+    "Williams":    {"OVR": 80, "EXP": 98, "RAC": 80, "AWA": 78, "PAC": 80},
+    "Cadillac":    {"OVR": 78, "EXP": 40, "RAC": 78, "AWA": 75, "PAC": 80},
+    "Audi":        {"OVR": 75, "EXP": 85, "RAC": 76, "AWA": 78, "PAC": 75} 
+}
+
+def draw_card_stats(surface, driver_name, card_x, card_y):
+    # --- BULLETPROOF DICTIONARY MATCHING ---
+    clean_name = driver_name.replace(" ", "").lower()
+    bulletproof_stats = {k.replace(" ", "").lower(): v for k, v in driver_stats.items()}
+    
+    stats = bulletproof_stats.get(clean_name, {"OVR": 75, "EXP": 75, "RAC": 75, "AWA": 75, "PAC": 75})
+    # ---------------------------------------
+    
+    positions = {
+        "OVR": (card_x + 30, card_y + 73),
+        "EXP": (card_x + 21, card_y + 236),
+        "RAC": (card_x + 69, card_y + 235),
+        "AWA": (card_x + 115, card_y + 235),
+        "PAC": (card_x + 163, card_y + 235),
+    }
+
+    for stat_name, position in positions.items():
+        val_str = str(int(stats[stat_name])).zfill(2)
+        x_offset = 0
+        
+        if stat_name == "OVR":
+            current_dict = ovr_images
+            spacing = OVR_W
+        else:
+            current_dict = stat_images
+            spacing = STAT_W
+
+        for digit in val_str:
+            if digit in current_dict:
+                surface.blit(current_dict[digit], (position[0] + x_offset, position[1]))
+                x_offset += spacing
+# ==========================================
 # Track-relative checkpoints (where they sit on the 12800x7200 image)
 bahrain_checkpoints = [
     pygame.Rect(6176, 6295, 600, 600),
@@ -283,7 +547,8 @@ VCARB = pygame.image.load(os.path.join(script_dir, r"assets\VCARB.png")).convert
 AstonMartin = pygame.image.load(os.path.join(script_dir, r"assets\AstonMartin.png")).convert_alpha()
 Haas = pygame.image.load(os.path.join(script_dir, r"assets\Haas.png")).convert_alpha()
 Alpine = pygame.image.load(os.path.join(script_dir, r"assets\Alpine.png")).convert_alpha()
-Sauber = pygame.image.load(os.path.join(script_dir, r"assets\Sauber.png")).convert_alpha()
+Audi = pygame.image.load(os.path.join(script_dir, r"assets\Audi.png")).convert_alpha()
+Cadillac = pygame.image.load(os.path.join(script_dir, r"assets\Cadillac.png")).convert_alpha()
 
 car = Alpine
 car_name = "Alpine"
@@ -442,12 +707,13 @@ n = None
 
 # Car Grid definition for both selection and networking logic
 all_teams = [
-    (Mclaren, 120, 130, 'Mclaren'), (Mercedes, 320, 130, 'Mercedes'),
-    (Redbull, 520, 130, 'Redbull'), (VCARB, 720, 130, 'VCARB'),
-    (ferrari, 920, 130, 'ferrari'), (Williams, 120, 400, 'Williams'),
-    (AstonMartin, 320, 400, 'AstonMartin'), (Haas, 520, 400, 'Haas'),
-    (Sauber, 720, 400, 'Sauber'), (Alpine, 920, 400, 'Alpine')
-]
+            (Mclaren, 20, 80, 'Mclaren'), (Mercedes, 180, 80, 'Mercedes'),
+            (Redbull, 340, 80, 'Redbull'), (VCARB, 500, 80, 'VCARB'),
+            (ferrari, 660, 80, 'ferrari'), (Williams, 820, 80, 'Williams'),
+            (AstonMartin, 100, 350, 'AstonMartin'), (Haas, 260, 350, 'Haas'),
+            (Audi, 420, 350, 'Audi'), (Alpine, 580, 350, 'Alpine'), 
+            (Cadillac, 740, 350, 'Cadillac')
+        ]
 
 # Initialize this so the game doesn't crash on the first frame
 taken_cars = [] 
@@ -533,14 +799,31 @@ while True:
                         card_name = market_selected["name"]
                         card_price = market_selected["price"]
                         
+                        # --- NEW: List of valid playable teams ---
+                        game_teams = ["Mclaren", "Mercedes", "Redbull", "VCARB", "ferrari", "Williams", "AstonMartin", "Haas", "Audi", "Alpine", "Cadillac"]
+                        
                         if card_name in my_drivers:
-                            market_msg = "You already own this driver!"
+                            market_msg = "You already own this card!"
                         elif my_pts >= card_price:
                             user_points[loggedInUser] -= card_price
                             save_points()
+                            
+                            # 1. Add to your visual inventory
                             my_drivers.append(card_name)
                             owned_drivers[loggedInUser] = my_drivers
                             save_drivers()
+                            
+                            # 2. If it's a team, unlock it for racing!
+                            for team in game_teams:
+                                # We check in lowercase just in case your image file is named slightly differently (e.g. "Ferrari.png" vs "ferrari")
+                                if card_name.lower() == team.lower():
+                                    my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"])
+                                    if team not in my_unlocked:
+                                        my_unlocked.append(team)
+                                        unlocked_cars[loggedInUser] = my_unlocked
+                                        save_unlocked_cars()
+                                    break # Stop searching once we find a match
+                            
                             market_msg = f"Purchased {card_name}!"
                         else:
                             market_msg = f"Need {card_price - my_pts} more PTS."
@@ -619,7 +902,7 @@ while True:
                                     try:
                                         img = pygame.image.load(path).convert_alpha()
                                         # Scale for grid (190x250) keeps the aspect ratio
-                                        inventory_loaded_imgs[drv] = pygame.transform.scale(img, (190, 250)) 
+                                        inventory_loaded_imgs[drv] = pygame.transform.scale(img, (228, 300)) 
                                     except: pass
 
                 # --- NEW: Inventory Screen Clicks ---
@@ -749,7 +1032,7 @@ while True:
                                 
                                 speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 
                                             'ferrari': 13, 'Williams': 12.5, 'AstonMartin': 12, 
-                                            'Haas': 11.5, 'Sauber': 11, 'Alpine': 10.5}
+                                            'Haas': 11.5, 'Audi': 11, 'Alpine': 10.5, 'Cadillac': 10}
                                 maxSpeed = speed_map[name]
                                 carMaxSpeed = maxSpeed
 
@@ -848,31 +1131,114 @@ while True:
                 if gamestate == "carSelect":
                     if 30 < mouseX < 90 and 30 < mouseY < 90:
                         gamestate = "main"
-                    # --- NEW: Confirm Button Click (Goes to Choose Track) ---
-                    elif 1050 < mouseX < 1250 and 600 < mouseY < 680:
+                        
+                    # --- SIDEBAR BUTTON CLICKS ---
+                    elif 950 < mouseX < 1200 and 590 < mouseY < 670: # CONFIRM RACE
                         gamestate = "ChooseTrack"
-                    # --------------------------------------------------------
+                    elif 950 < mouseX < 1200 and 490 < mouseY < 570: # REPLACE DRIVER
+                        gamestate = "driverSelect"
+                        inventory_page = 0
+                        my_drivers = owned_drivers.get(loggedInUser, [])
+                        for drv in my_drivers:
+                            if drv not in inventory_loaded_imgs:
+                                path = find_driver_card(drv)
+                                if path:
+                                    try:
+                                        img = pygame.image.load(path).convert_alpha()
+                                        inventory_loaded_imgs[drv] = pygame.transform.scale(img, (228, 300)) 
+                                    except: pass
+                    # -----------------------------
                     else:
-                        # --- REFACTORED CAR CLICK LOGIC ---
                         car_select_grid = [
-                            (Mclaren, 120, 20, "Mclaren", 15), (Mercedes, 320, 20, "Mercedes", 14.5),
-                            (Redbull, 520, 20, "Redbull", 14), (VCARB, 720, 20, "VCARB", 13.5),
-                            (ferrari, 920, 20, "ferrari", 13), (Williams, 120, 350, "Williams", 12.5),
-                            (AstonMartin, 320, 350, "AstonMartin", 12), (Haas, 520, 350, "Haas", 11.5),
-                            (Sauber, 720, 350, "Sauber", 11), (Alpine, 920, 350, "Alpine", 10.5)
+                            (Mclaren, 50, 80, "Mclaren", 15), (Mercedes, 190, 80, "Mercedes", 14.5),
+                            (Redbull, 330, 80, "Redbull", 14), (VCARB, 470, 80, "VCARB", 13.5),
+                            (ferrari, 610, 80, "ferrari", 13), (Williams, 750, 80, "Williams", 12.5),
+                            (AstonMartin, 120, 360, "AstonMartin", 12), (Haas, 260, 360, "Haas", 11.5),
+                            (Audi, 400, 360, "Audi", 11), (Alpine, 540, 360, "Alpine", 10.5), 
+                            (Cadillac, 680, 360, "Cadillac", 10)
                         ]
                         
-                        # Get user's cars, default to Alpine if not logged in
                         my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
 
                         for img, x, y, name, speed_val in car_select_grid:
-                            if x < mouseX < x + 185 and y < mouseY < y + 274:
-                                if name in my_unlocked: # Only equip if unlocked!
+                            if x < mouseX < x + 130 and y < mouseY < y + 195:
+                                if name in my_unlocked:
                                     car = img
                                     car_name = name
-                                    carMaxSpeed = speed_val
+                                    
+                                    # --- UPDATED: Fetch driver specific to THIS car ---
+                                    user_squads = active_driver.get(loggedInUser, {})
+                                    if not isinstance(user_squads, dict): user_squads = {} # Safety check for old saves
+                                    my_drv = user_squads.get(name, "None")
+                                    
+                                    carMaxSpeed = get_boosted_speed(speed_val, my_drv)
                                     maxSpeed = carMaxSpeed
+                                    # --------------------------------------------------
+
+                # --- UPDATED: Driver Select Clicks (Squad Builder) ---
+                elif gamestate == "driverSelect":
+                    if 30 < mouseX < 90 and 30 < mouseY < 90: # Back Button
+                        gamestate = "carSelect"
+                        squad_typing = False
                     
+                    # Search Box Click
+                    elif 400 < mouseX < 860 and 25 < mouseY < 75:
+                        squad_typing = True
+                    else:
+                        squad_typing = False
+
+                    # 1. Fetch raw drivers and filter out teams!
+                    raw_drivers = owned_drivers.get(loggedInUser, [])
+                    game_teams_lower = [t.lower() for t in ["Mclaren", "Mercedes", "Redbull", "VCARB", "ferrari", "Williams", "AstonMartin", "Haas", "Audi", "Alpine", "Cadillac"]]
+                    
+                    filtered_drivers = [d for d in raw_drivers if d.lower() not in game_teams_lower]
+                    
+                    # 2. Apply search filter
+                    if squad_search_input:
+                        filtered_drivers = [d for d in filtered_drivers if squad_search_input.lower() in d.lower()]
+
+                    max_pages = max(0, (len(filtered_drivers) - 1) // 8)
+                    
+                    if 50 < mouseX < 150 and 330 < mouseY < 390 and inventory_page > 0: inventory_page -= 1
+                    elif 1130 < mouseX < 1230 and 330 < mouseY < 390 and inventory_page < max_pages: inventory_page += 1
+
+                    # Click to Equip Driver
+                    start_x, start_y, x_spacing, y_spacing = 70, 110, 290, 320 
+                    start_idx = inventory_page * 8
+                    end_idx = min(start_idx + 8, len(filtered_drivers))
+                    
+                    for i in range(start_idx, end_idx):
+                        row, col = (i - start_idx) // 4, (i - start_idx) % 4
+                        draw_x = start_x + (col * x_spacing)
+                        draw_y = start_y + (row * y_spacing)
+                        
+                        if draw_x < mouseX < draw_x + 228 and draw_y < mouseY < draw_y + 300: 
+                            
+                            if loggedInUser not in active_driver or not isinstance(active_driver[loggedInUser], dict):
+                                active_driver[loggedInUser] = {}
+                            
+                            # --- NEW: UNEQUIP FROM OTHER CARS FIRST ---
+                            target_driver = filtered_drivers[i]
+                            
+                            # Loop through all your cars and remove this driver if they are equipped elsewhere
+                            for existing_car, existing_driver in list(active_driver[loggedInUser].items()):
+                                if existing_driver == target_driver:
+                                    active_driver[loggedInUser][existing_car] = "None"
+                            # ------------------------------------------
+                            
+                            # Equip the driver to the CURRENT car
+                            active_driver[loggedInUser][car_name] = target_driver
+                            save_active_driver()
+                            
+                            base_speed = 10
+                            speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 'ferrari': 13, 'Williams': 12.5, 'AstonMartin': 12, 'Haas': 11.5, 'Audi': 11, 'Alpine': 10.5, 'Cadillac': 10}
+                            if car_name in speed_map: base_speed = speed_map[car_name]
+                            
+                            carMaxSpeed = get_boosted_speed(base_speed, target_driver)
+                            maxSpeed = carMaxSpeed
+                            gamestate = "carSelect"
+                            squad_typing = False
+                # -------------------------------------------------
 
 
                 # crash and settings screen back to main menu
@@ -889,6 +1255,30 @@ while True:
         # keyboard events
         if ev.type == pygame.KEYDOWN:  
             
+            # --- NEW: SQUAD BUILDER SEARCH VARIABLES ---
+            # (If these aren't initialized at the top of your file, Python will create them here)
+            if 'squad_search_input' not in globals(): squad_search_input = ""
+            if 'squad_typing' not in globals(): squad_typing = False
+            # -------------------------------------------
+
+            if typing and (gamestate == "signUp" or gamestate == "signIn"):
+                # ... (Keep your existing sign up typing logic) ...
+                pass
+
+            if market_typing and gamestate == "market":
+                # ... (Keep your existing market typing logic) ...
+                pass
+
+            # --- NEW: SQUAD BUILDER TYPING LOGIC ---
+            if squad_typing and gamestate == "driverSelect":
+                if ev.key == pygame.K_BACKSPACE:
+                    squad_search_input = squad_search_input[:-1]
+                elif ev.key == pygame.K_RETURN:
+                    squad_typing = False
+                else:
+                    if len(squad_search_input) <= 20 and (ev.unicode.isalpha() or ev.key == pygame.K_SPACE):
+                        squad_search_input += ev.unicode
+            # ---------------------------------------
             # --- NEW: Typing Logic ---
             if typing and (gamestate == "signUp" or gamestate == "signIn"):
                 if ev.key == pygame.K_BACKSPACE:
@@ -1000,10 +1390,17 @@ while True:
                                 car_name = name
                                 speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 
                                             'ferrari': 13, 'Williams': 12.5, 'AstonMartin': 12, 
-                                            'Haas': 11.5, 'Sauber': 11, 'Alpine': 10.5}
-                                maxSpeed = speed_map[name]
+                                            'Haas': 11.5, 'Audi': 11, 'Alpine': 10.5, 'Cadillac': 10}
+                                
+                                # --- UPDATED: Multiplayer Speed Boost (Per-Car) ---
+                                user_squads = active_driver.get(loggedInUser, {})
+                                if not isinstance(user_squads, dict): user_squads = {}
+                                my_drv = user_squads.get(name, "None")
+                                
+                                maxSpeed = get_boosted_speed(speed_map[name], my_drv)
                                 carMaxSpeed = maxSpeed
-                                break 
+                                # --------------------------------------------------
+                                break
                 # --------------------------------
 
                 # Pull clients into race
@@ -1113,11 +1510,16 @@ while True:
                 speed = 0
                 pitstopReset()
                 pitstop = False
-            elif car == Sauber and centerColor == (14, 167, 24):
+            elif car == Audi and centerColor == (14, 167, 24):
                 speed = 0
                 pitstopReset()
                 pitstop = False
             elif car == Alpine and centerColor == (161, 108, 144):
+                speed = 0
+                pitstopReset()
+                pitstop = False
+            # --- NEW: Cadillac Pitstop ---
+            elif car == Cadillac and centerColor == (255, 255, 0): # Bright yellow pixel trigger
                 speed = 0
                 pitstopReset()
                 pitstop = False
@@ -1190,8 +1592,8 @@ while True:
             car_images = {
                 "ferrari": ferrari, "Mclaren": Mclaren, "Mercedes": Mercedes,
                 "Redbull": Redbull, "VCARB": VCARB, "Williams": Williams,
-                "AstonMartin": AstonMartin, "Haas": Haas, "Sauber": Sauber,
-                "Alpine": Alpine
+                "AstonMartin": AstonMartin, "Haas": Haas, "Audi": Audi,
+                "Alpine": Alpine, "Cadillac": Cadillac
             }
 
             for i, p in enumerate(lobby_data):
@@ -1659,48 +2061,101 @@ while True:
         screen.blit(menu, (0,0))
         
         # back button
-        if 30 < mouseX < 90 and 30 < mouseY < 90:
-            pygame.draw.circle(screen, ("white"), (60, 60), 33)
-        else:
-            pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
+        if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
+        else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
-        # --- NEW: Draw Confirm Button ---
-        if 1050 < mouseX < 1250 and 600 < mouseY < 680:
-            pygame.draw.rect(screen, (100, 255, 100), (1050, 600, 200, 80), 0, 15)
-        else:
-            pygame.draw.rect(screen, (50, 200, 50), (1050, 600, 200, 80), 0, 15)
+        # ==========================================
+        # --- THE GLASS SIDEBAR (Right Side) ---
+        sidebar = pygame.Surface((380, 720), pygame.SRCALPHA)
+        sidebar.fill((20, 20, 20, 220)) 
+        screen.blit(sidebar, (900, 0))
         
+        # --- Fetch driver specific to the active car ---
+        user_squads = active_driver.get(loggedInUser, {})
+        if not isinstance(user_squads, dict): user_squads = {}
+        my_drv = user_squads.get(car_name, "None")
+        # -----------------------------------------------
+
+        # 1. Auto-Load the Active Driver's Image if missing
+        if my_drv != "None" and my_drv not in inventory_loaded_imgs:
+            path = find_driver_card(my_drv)
+            if path:
+                try:
+                    img = pygame.image.load(path).convert_alpha()
+                    inventory_loaded_imgs[my_drv] = pygame.transform.scale(img, (228, 300)) 
+                except: pass
+
+        # 2. Draw Active Driver Card (Top)
+        if my_drv in inventory_loaded_imgs:
+            card_x, card_y = 976, 20 # Centered perfectly in the sidebar
+            screen.blit(inventory_loaded_imgs[my_drv], (card_x, card_y))
+            draw_card_stats(screen, my_drv, card_x, card_y)
+        else:
+            pygame.draw.rect(screen, (50, 50, 50), (976, 20, 228, 300), 0, 10)
+            screen.blit(f1font2.render("NO DRIVER", True, (150, 150, 150)), (1000, 150))
+
+        # 3. Dynamic Speed Stats (Shifted Down!)
+        base = 10
+        speed_map = {'Mclaren': 15, 'Mercedes': 14.5, 'Redbull': 14, 'VCARB': 13.5, 'ferrari': 13, 'Williams': 12.5, 'AstonMartin': 12, 'Haas': 11.5, 'Audi': 11, 'Alpine': 10.5, 'Cadillac': 10}
+        if car_name in speed_map: base = speed_map[car_name]
+        
+        screen.blit(f1font2.render(f"Car: {car_name.upper()}", True, "white"), (950, 330))
+
+        pygame.draw.rect(screen, (40, 40, 40), (950, 370, 280, 100), 0, 15)
+        screen.blit(f1font2.render(f"Base Spd: {base}", True, (200, 200, 200)), (970, 385))
+        screen.blit(f1font2.render(f"TOP SPD: {round(carMaxSpeed, 1)}", True, (255, 215, 0)), (970, 425))
+
+        # 4. REPLACE Button
+        if 950 < mouseX < 1230 and 490 < mouseY < 570: pygame.draw.rect(screen, (100, 200, 255), (950, 490, 280, 80), 0, 15)
+        else: pygame.draw.rect(screen, (50, 150, 255), (950, 490, 280, 80), 0, 15)
+        equip_text = f1font2.render("REPLACE", True, "black")
+        screen.blit(equip_text, equip_text.get_rect(center=(1090, 530)))
+
+        # 5. CONFIRM RACE Button
+        if 950 < mouseX < 1230 and 590 < mouseY < 670: pygame.draw.rect(screen, (100, 255, 100), (950, 590, 280, 80), 0, 15)
+        else: pygame.draw.rect(screen, (50, 200, 50), (950, 590, 280, 80), 0, 15)
         conf_text = f1font2.render("CONFIRM", True, "black")
-        screen.blit(conf_text, conf_text.get_rect(center=(1150, 640)))
-        # --------------------------------
+        screen.blit(conf_text, conf_text.get_rect(center=(1090, 630)))
+        # ==========================================
 
         # --- REFACTORED CAR DRAWING WITH LOCKS ---
         car_select_grid = [
-            (Mclaren, 120, 20, "Mclaren"), (Mercedes, 320, 20, "Mercedes"),
-            (Redbull, 520, 20, "Redbull"), (VCARB, 720, 20, "VCARB"),
-            (ferrari, 920, 20, "ferrari"), (Williams, 120, 350, "Williams"),
-            (AstonMartin, 320, 350, "AstonMartin"), (Haas, 520, 350, "Haas"),
-            (Sauber, 720, 350, "Sauber"), (Alpine, 920, 350, "Alpine")
+            (Mclaren, 50, 80, "Mclaren"), (Mercedes, 190, 80, "Mercedes"),
+            (Redbull, 330, 80, "Redbull"), (VCARB, 470, 80, "VCARB"),
+            (ferrari, 610, 80, "ferrari"), (Williams, 750, 80, "Williams"),
+            (AstonMartin, 120, 360, "AstonMartin"), (Haas, 260, 360, "Haas"),
+            (Audi, 400, 360, "Audi"), (Alpine, 540, 360, "Alpine"), 
+            (Cadillac, 680, 360, "Cadillac")
         ]
 
         my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
 
         for img, x, y, name in car_select_grid:
-            is_hovered = x < mouseX < x + 185 and y < mouseY < y + 274
+            is_hovered = x < mouseX < x + 130 and y < mouseY < y + 195
+            
+            # Base scaled sizes
+            normal_size = (110, 165)
+            hover_size = (130, 195)
             
             if name not in my_unlocked:
-                # Draw Gray Locked Car
-                gray_car = pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274))
-                gray_car.fill((50, 50, 50), special_flags=pygame.BLEND_RGB_MULT)
-                screen.blit(gray_car, (x, y))
-                screen.blit(f1font2.render("LOCKED", True, "red"), (x + 35, y + 120))
+                # Sleek Silhouette Lock
+                gray_car = pygame.transform.scale(pygame.transform.rotate(img, -90), normal_size)
+                gray_car.fill((40, 40, 40), special_flags=pygame.BLEND_RGB_MULT) # Darker silhouette
+                screen.blit(gray_car, (x + 10, y + 15))
+                
+                # Small badge instead of huge text
+                pygame.draw.rect(screen, (200, 50, 50), (x + 20, y + 150, 90, 30), 0, 5)
+                screen.blit(pygame.font.SysFont("Arial", 16, bold=True).render("LOCKED", True, "white"), (x + 32, y + 156))
             else:
                 # Draw Normal Unlocked Car
                 if is_hovered or car == img:
-                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (144, 213)), (x + 20, y + 20))
+                    # Pop out slightly when selected
+                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), hover_size), (x, y))
+                    if car == img: # Draw a subtle green glow ring for the active car
+                        pygame.draw.rect(screen, (100, 255, 100), (x-5, y-5, 140, 205), 3, 15)
                 else:
-                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), (185, 274)), (x, y))
+                    screen.blit(pygame.transform.scale(pygame.transform.rotate(img, -90), normal_size), (x + 10, y + 15))
     # --- UPDATED: Market Screen Visuals ---
     elif gamestate == "market":
         screen.blit(menu, (0,0))
@@ -1737,8 +2192,13 @@ while True:
 
         # Draw Selected Card Preview (Right Side)
         if market_selected and market_loaded_img:
-            # Draw Card
+            
+            # 1. Draw the Base Card
             screen.blit(market_loaded_img, (800, 280))
+            
+            # --- NEW: 2. Overlay the Dynamic Ratings ---
+            draw_card_stats(screen, market_selected["name"], 800, 280)
+            # -----------------------------------------
             
             # Draw Purchase Button
             if 800 < mouseX < 1000 and 600 < mouseY < 660: pygame.draw.rect(screen, (100, 255, 100), (800, 600, 200, 60), 0, 15)
@@ -1876,11 +2336,12 @@ while True:
 
         # Car Grid with Exclusivity AND Locks
         all_teams = [
-            (Mclaren, 120, 130, 'Mclaren'), (Mercedes, 320, 130, 'Mercedes'),
-            (Redbull, 520, 130, 'Redbull'), (VCARB, 720, 130, 'VCARB'),
-            (ferrari, 920, 130, 'ferrari'), (Williams, 120, 400, 'Williams'),
-            (AstonMartin, 320, 400, 'AstonMartin'), (Haas, 520, 400, 'Haas'),
-            (Sauber, 720, 400, 'Sauber'), (Alpine, 920, 400, 'Alpine')
+            (Mclaren, 20, 80, 'Mclaren'), (Mercedes, 180, 80, 'Mercedes'),
+            (Redbull, 340, 80, 'Redbull'), (VCARB, 500, 80, 'VCARB'),
+            (ferrari, 660, 80, 'ferrari'), (Williams, 820, 80, 'Williams'),
+            (AstonMartin, 100, 350, 'AstonMartin'), (Haas, 260, 350, 'Haas'),
+            (Audi, 420, 350, 'Audi'), (Alpine, 580, 350, 'Alpine'), 
+            (Cadillac, 740, 350, 'Cadillac')
         ]
 
         my_unlocked = unlocked_cars.get(loggedInUser, ["Alpine"]) if loggedInUser else ["Alpine"]
@@ -2032,76 +2493,88 @@ while True:
         my_cars = unlocked_cars.get(loggedInUser, ["Alpine"])
         screen.blit(f1font2.render(f"Your Garage:", True, ("white")), (430, 280))
 
-        # --- UPDATED: Replace Text List with 'View Cards' Button ---
+        # View Cards Button (No more overlapping text!)
         if 750 < mouseX < 1150 and 280 < mouseY < 360: 
             pygame.draw.rect(screen, (100, 200, 255), (750, 280, 400, 80), 0, 15)
         else: 
             pygame.draw.rect(screen, "white", (750, 280, 400, 80), 0, 15)
         screen.blit(f1font.render("View My Cards", True, "black"), (790, 295))
-        # -----------------------------------------------------------
-        my_drivers = owned_drivers.get(loggedInUser, [])
-        screen.blit(f1font2.render(f"Driver Roster:", True, ("white")), (750, 280))
         
-        y_offset_drv = 320 
-        for driver in my_drivers[-8:]: # Only show the 8 most recent to save screen space
-            screen.blit(f1font2.render(f"- {driver}", True, (100, 255, 255)), (770, y_offset_drv))
-            y_offset_drv += 35
-        
-        y_offset = 320 # Pushed down slightly to make room for points
+        # Draw the Unlocked Cars List
+        y_offset = 320 
         for unlocked_car in my_cars:
             screen.blit(f1font2.render(f"- {unlocked_car}", True, (100, 255, 100)), (450, y_offset))
             y_offset += 35
+
 
         # Sign Out Button
         if 440 < mouseX < 840 and 550 < mouseY < 630: pygame.draw.rect(screen, (255, 100, 100), (440, 550, 400, 80), 0, 15)
         else: pygame.draw.rect(screen, (200, 50, 50), (440, 550, 400, 80), 0, 15)
         screen.blit(f1font.render('Sign Out', True, ("white")), (520, 560))
     
-    # --- NEW: Inventory / Owned Cards Screen Visuals ---
-    elif gamestate == "inventory":
+    # --- UPDATED: Inventory & Squad Equip Screen ---
+    elif gamestate in ["inventory", "driverSelect"]:
         screen.blit(menu, (0,0))
         
-        # Back button
         if 30 < mouseX < 90 and 30 < mouseY < 90: pygame.draw.circle(screen, ("white"), (60, 60), 33)
         else: pygame.draw.circle(screen, ("light grey"), (60, 60), 30)
         screen.blit(f1font2.render("←", True, ("black")) , (47, 47))
 
-        screen.blit(f1font.render("My Card Collection", True, ("white")), (400, 40))
-
-        my_drivers = owned_drivers.get(loggedInUser, [])
-        max_pages = max(0, (len(my_drivers) - 1) // 8)
-
-        if len(my_drivers) == 0:
-            screen.blit(f1font2.render("You don't own any drivers yet! Go to the Market.", True, "red"), (350, 300))
+        # Filtering Logic for Drawing
+        raw_drivers = owned_drivers.get(loggedInUser, [])
+        filtered_drivers = raw_drivers
+        
+        if gamestate == "driverSelect":
+            # 1. Remove Teams
+            game_teams_lower = [t.lower() for t in ["Mclaren", "Mercedes", "Redbull", "VCARB", "ferrari", "Williams", "AstonMartin", "Haas", "Audi", "Alpine", "Cadillac"]]
+            filtered_drivers = [d for d in raw_drivers if d.lower() not in game_teams_lower]
+            
+            # 2. Apply Search
+            if 'squad_search_input' not in globals(): squad_search_input = ""
+            if 'squad_typing' not in globals(): squad_typing = False
+            
+            if squad_search_input:
+                filtered_drivers = [d for d in filtered_drivers if squad_search_input.lower() in d.lower()]
+                
+            # 3. Draw Search Box
+            pygame.draw.rect(screen, "white", (400, 25, 460, 50), 0, 15)
+            if squad_typing: pygame.draw.rect(screen, (100, 200, 255), (400, 25, 460, 50), 4, 15)
+            s_text = f1font2.render(squad_search_input if squad_search_input else "Search Drivers...", True, (0,0,0) if squad_search_input else (150,150,150))
+            screen.blit(s_text, (420, 35))
         else:
-            screen.blit(f1font2.render(f"Page {inventory_page + 1} / {max_pages + 1}", True, "white"), (560, 100))
+            screen.blit(f1font.render("My Card Collection", True, ("white")), (400, 30))
 
-            # Draw Grid (4 columns, 2 rows)
-            start_x = 200
-            start_y = 150
-            x_spacing = 220
-            y_spacing = 270
+        max_pages = max(0, (len(filtered_drivers) - 1) // 8)
 
+        if len(raw_drivers) == 0:
+            screen.blit(f1font2.render("You don't own any cards yet! Go to the Market.", True, "red"), (350, 300))
+        elif len(filtered_drivers) == 0:
+            screen.blit(f1font2.render("No drivers found matching that search.", True, "white"), (450, 300))
+        else:
+            screen.blit(f1font2.render(f"Page {inventory_page + 1} / {max_pages + 1}", True, "white"), (1050, 45)) 
+
+            # Shifted down slightly to accommodate the search bar
+            start_x, start_y, x_spacing, y_spacing = 70, 110, 290, 320 
             start_idx = inventory_page * 8
-            end_idx = min(start_idx + 8, len(my_drivers))
+            end_idx = min(start_idx + 8, len(filtered_drivers))
 
             for i in range(start_idx, end_idx):
-                drv = my_drivers[i]
-                row = (i - start_idx) // 4
-                col = (i - start_idx) % 4
-                
+                drv = filtered_drivers[i]
+                row, col = (i - start_idx) // 4, (i - start_idx) % 4
                 draw_x = start_x + (col * x_spacing)
                 draw_y = start_y + (row * y_spacing)
                 
+                if gamestate == "driverSelect" and draw_x < mouseX < draw_x + 228 and draw_y < mouseY < draw_y + 300:
+                    pygame.draw.rect(screen, (100, 255, 100), (draw_x-6, draw_y-6, 240, 312), 0, 12)
+                    screen.blit(f1font.render("EQUIP", True, (100, 255, 100)), (draw_x + 40, draw_y + 120))
+                
                 if drv in inventory_loaded_imgs:
-                    # Adds a clean white border behind the card
-                    pygame.draw.rect(screen, "white", (draw_x-3, draw_y-3, 196, 256), 0, 10)
                     screen.blit(inventory_loaded_imgs[drv], (draw_x, draw_y))
+                    draw_card_stats(screen, drv, draw_x, draw_y)
                 else:
-                    pygame.draw.rect(screen, (50,50,50), (draw_x, draw_y, 190, 250), 0, 10)
-                    screen.blit(f1font2.render("Loading...", True, "white"), (draw_x + 20, draw_y + 100))
+                    pygame.draw.rect(screen, (50,50,50), (draw_x, draw_y, 228, 300), 0, 10)
+                    screen.blit(f1font2.render("Loading...", True, "white"), (draw_x + 40, draw_y + 130))
 
-            # Draw Pagination Buttons
             if inventory_page > 0:
                 if 50 < mouseX < 150 and 330 < mouseY < 390: pygame.draw.rect(screen, (200, 200, 200), (50, 330, 100, 60), 0, 15)
                 else: pygame.draw.rect(screen, "white", (50, 330, 100, 60), 0, 15)
