@@ -1575,43 +1575,41 @@ while True:
                     if 480 < mouseX < 835 and 50 < mouseY < 287:
                         currentTrack = bahrainTrack
                         gamestate = "tyreSelect"
-                        trackX, trackY, angle = bahrain_grid[0]
+                        
+                        # --- NEW: RANDOM GRID POSITIONS ---
+                        grid_slots = list(range(10))
+                        random.shuffle(grid_slots)
+                        my_slot = grid_slots.pop(0) # Take the first random slot for the player
+                        trackX, trackY, angle = bahrain_grid[my_slot]
+                        # ----------------------------------
+                        
                         lightSound.set_volume(100)
                         lightSound.play() 
-                        lap = 0
-                        points_awarded = False
-                        lap1time, lap2time, lap3time = 0, 0, 0
-                        speed = 0
-                        lightsOut = False
-                        lights = -1
+                        lap, lap1time, lap2time, lap3time, speed = 0, 0, 0, 0, 0
+                        points_awarded, lightsOut, pendingPenalty, TimePenalty = False, False, False, 0
+                        lights, time = -1, -7
                         FLTW, FRTW, RLTW, RRTW = 99, 99, 99, 99
                         tyresintact = True
-                        pendingPenalty, TimePenalty = False, 0
-                        time = -7
                         
                         # --- NEW: SPAWN BAHRAIN AI BOTS ---
                         offline_ai_cars = []
-                        
-                        if ENABLE_OFFLINE_AI: # <--- ADD THIS WRAPPER
-                            # Added all teams to the pool for a diverse grid!
+                        if ENABLE_OFFLINE_AI: 
                             teams = [('Mclaren', Mclaren), ('Mercedes', Mercedes), ('Redbull', Redbull), 
                                      ('ferrari', ferrari), ('AstonMartin', AstonMartin), ('Williams', Williams),
                                      ('VCARB', VCARB), ('Haas', Haas), ('Audi', Audi), ('Alpine', Alpine), ('Cadillac', Cadillac)]
                             teams = [t for t in teams if t[0] != car_name] 
-                            for i in range(1, 10): # Spawn 9 bots
-                                gx, gy, ga = bahrain_grid[i] if i < len(bahrain_grid) else (trackX, trackY, angle)
+                            
+                            for i, slot_idx in enumerate(grid_slots): # Loop over the remaining 9 slots
+                                gx, gy, ga = bahrain_grid[slot_idx]
                                 t_name, t_img = teams[i % len(teams)]
                                 
-                                # Updated 2026 AI Base Speed Logic
                                 team_base_speeds = {
                                     'Mercedes': 15.5, 'ferrari': 15.0, 'Mclaren': 14.0, 'Haas': 13.0, 
                                     'Alpine': 12.5, 'Redbull': 12.5, 'VCARB': 12.0, 'Audi': 11.5, 
                                     'Williams': 11.0, 'Cadillac': 10.5, 'AstonMartin': 10.0
                                 }
-
                                 base_spd = team_base_speeds.get(t_name, 12.0) + random.uniform(-0.5, 1.0)
                                 
-                                # Assign Random Tyre Compound
                                 comp = random.choice(["Soft", "Medium", "Hard"])
                                 if comp == "Soft": base_spd += 1.0
                                 elif comp == "Hard": base_spd -= 0.5
@@ -1623,42 +1621,42 @@ while True:
                                     'offset_x': random.randint(int(-CHECKPOINT_RADIUS * 0.5), int(CHECKPOINT_RADIUS * 0.5)), 
                                     'offset_y': random.randint(int(-CHECKPOINT_RADIUS * 0.5), int(CHECKPOINT_RADIUS * 0.5)),
                                     'mistake_timer': 0,
-                                    'tyre': comp
+                                    'tyre': comp,
+                                    'reaction_delay': random.randint(5, 45) # 5 to 45 frame delay at lights out
                                 })
                     # silverstone track selection
                     elif 480 < mouseX < 835 and 450 < mouseY < 687:
                         currentTrack = silverstoneTrack
                         gamestate = "tyreSelect"
-                        trackX, trackY, angle = silverstone_grid[0]
+                        
+                        # --- NEW: RANDOM GRID POSITIONS ---
+                        grid_slots = list(range(10))
+                        random.shuffle(grid_slots)
+                        my_slot = grid_slots.pop(0) 
+                        trackX, trackY, angle = silverstone_grid[my_slot]
+                        # ----------------------------------
+                        
                         lightSound.set_volume(100)
                         lightSound.play() 
-                        lap = 0
-                        points_awarded = False
-                        lap1time, lap2time, lap3time = 0, 0, 0
-                        speed = 0
-                        lightsOut = False
-                        lights = -1
+                        lap, lap1time, lap2time, lap3time, speed = 0, 0, 0, 0, 0
+                        points_awarded, lightsOut, pendingPenalty, TimePenalty = False, False, False, 0
+                        lights, time = -1, -7
                         FLTW, FRTW, RLTW, RRTW = 99, 99, 99, 99
                         tyresintact = True
-                        pendingPenalty, TimePenalty = False, 0
-                        time = -7
 
                         # --- NEW: SPAWN SILVERSTONE AI BOTS ---
                         offline_ai_cars = []
-                        
-                        if ENABLE_OFFLINE_AI: # <--- ADD THIS WRAPPER
+                        if ENABLE_OFFLINE_AI: 
                             teams = [('Mclaren', Mclaren), ('Mercedes', Mercedes), ('Redbull', Redbull), 
                                      ('ferrari', ferrari), ('AstonMartin', AstonMartin), ('Williams', Williams),
                                      ('VCARB', VCARB), ('Haas', Haas), ('Audi', Audi), ('Alpine', Alpine), ('Cadillac', Cadillac)]
                             teams = [t for t in teams if t[0] != car_name] 
-                            for i in range(1, 10): # Spawn 9 bots
-                                # Spawn AI perfectly onto the grid slots 1 through 9!
-                                gx, gy, ga = silverstone_grid[i] if i < len(silverstone_grid) else (trackX, trackY, angle)
+                            
+                            for i, slot_idx in enumerate(grid_slots): 
+                                gx, gy, ga = silverstone_grid[slot_idx]
                                 t_name, t_img = teams[i % len(teams)]
-                                # Give them slightly random max speeds so they fight each other!
                                 base_spd = 13.0 + random.uniform(-0.5, 1.5)
                                 
-                                # Assign Random Tyre Compound
                                 comp = random.choice(["Soft", "Medium", "Hard"])
                                 if comp == "Soft": base_spd += 1.0
                                 elif comp == "Hard": base_spd -= 0.5
@@ -1670,7 +1668,8 @@ while True:
                                     'offset_x': random.randint(int(-CHECKPOINT_RADIUS * 0.5), int(CHECKPOINT_RADIUS * 0.5)),
                                     'offset_y': random.randint(int(-CHECKPOINT_RADIUS * 0.5), int(CHECKPOINT_RADIUS * 0.5)),
                                     'mistake_timer': 0,
-                                    'tyre': comp
+                                    'tyre': comp,
+                                    'reaction_delay': random.randint(5, 45) # 5 to 45 frame delay at lights out
                                 })
                     # back to main menu
                     elif 30 < mouseX < 90 and 30 < mouseY < 90:
@@ -2088,17 +2087,22 @@ while True:
                         if diff > 3: ai['angle'] += active_turn_speed
                         elif diff < -3: ai['angle'] -= active_turn_speed
                             
-                        # Dynamic Braking & Throttle
-                        if abs(diff) > 50: t_speed = ai['maxSpeed'] * 0.4 
-                        elif abs(diff) > 25: t_speed = ai['maxSpeed'] * 0.8 
-                        else: 
-                            t_speed = ai['maxSpeed'] 
-                            
-                            # --- NEW: AI DRS ACTIVATION ---
-                            if 'active_drs_zones' in globals() and active_drs_zones.get(ai['name'], False):
-                                t_speed += 2.0 # Give the AI a 2.0 DRS Speed Boost on straights!
-                            # ------------------------------
-                            
+                        # --- REACTION TIME SYSTEM ---
+                        if ai.get('reaction_delay', 0) > 0:
+                            ai['reaction_delay'] -= 1
+                            t_speed = 0 # Keep foot off the gas while reacting!
+                        else:
+                            # Dynamic Braking & Throttle
+                            if abs(diff) > 50: t_speed = ai['maxSpeed'] * 0.4 
+                            elif abs(diff) > 25: t_speed = ai['maxSpeed'] * 0.8 
+                            else: 
+                                t_speed = ai['maxSpeed'] 
+                                
+                                # AI DRS ACTIVATION
+                                if 'active_drs_zones' in globals() and active_drs_zones.get(ai['name'], False):
+                                    t_speed += 2.0 
+                        # ----------------------------
+                        
                         if ai['speed'] < t_speed: 
                             ai['speed'] += 0.2
                         elif ai['speed'] > t_speed: 
@@ -2768,15 +2772,14 @@ while True:
                 
                 active_checkpoints = bahrain_checkpoints if currentTrack == bahrainTrack else silverstone_checkpoints
                 
-                # --- FIXED: Use chk_idx directly to measure distance to your NEXT target ---
                 if active_checkpoints and chk_idx < len(active_checkpoints):
                     gate = active_checkpoints[chk_idx]
                     # Map coordinates back to 12800x7200 space
                     p_x, p_y = -p[0] + 640, -p[1] + 360
                     dist = math.sqrt((gate.centerx - p_x)**2 + (gate.centery - p_y)**2)
                 
-                # Algorithm: Each lap is worth 100k, each gate 2k, plus distance progress
-                return (laps * 100000) + (chk_idx * 2000) + (2000 - min(dist, 2000))
+                # --- FIXED: Increased Lap multiplier to 1,000,000 so it always outscores checkpoints! ---
+                return (laps * 1000000) + (chk_idx * 2000) + (2000 - min(dist, 2000))
 
             # Sort players dynamically using their exact pixel progress
             players_ranking = sorted(
