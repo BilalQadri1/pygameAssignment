@@ -331,8 +331,25 @@ show_last_char = False
 last_key_time = 0
 # ==========================================
 
-# 3. The rest of your normal setup continues below...
+import ctypes
+import pygame
+import os
+
+# 1. Tell Windows this is a distinct, standalone app
+# This string can be anything, it just needs to be unique to your game!
+myappid = 'bilalqadri.f1racing.game.1.0' 
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except AttributeError:
+    pass # Skips if you are on Mac/Linux
+
+# 2. Initialize Pygame
 pygame.init()
+
+# 3. Load your .ico file and set it
+icon_path = os.path.join(script_dir, r"assets\2418779.ico")
+icon = pygame.image.load(icon_path)
+pygame.display.set_icon(icon)
 
 # *********SETUP**********
 windowWidth = 1280
