@@ -2,7 +2,7 @@ import socket
 import threading
 import pickle
 import struct
-
+import json # <--- ADD THIS HERE
 server = "0.0.0.0" # Keeps it open for AWS/Cloud hosting
 port = 5555
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -11,6 +11,7 @@ s.listen()
 
 lobbies = {}
 lobby_id_counter = 0
+file_lock = threading.Lock() # <--- ADD THIS
 
 def send_data(conn, data):
     # Safely package and send data with a length header
@@ -59,7 +60,34 @@ def threaded_client(conn):
             break # Client disconnected cleanly or crashed
             
         try:
-            if request[0] == "GET":
+            # ==================================================
+            # --- NEW: SERVER DATABASE COMMANDS ---
+            if request[0] == "FETCH_DATA":
+                file_name = request[1]
+                try:
+                    with file_lock: # <--- LOCK THE FILE
+                        with open(file_name, "r") as f:
+                            file_data = json.load(f)
+                    send_data(conn, file_data)
+                except (FileNotFoundError, json.JSONDecodeError):
+                    if file_name == "market_listings.json":
+                        send_data(conn, [])
+                    else:
+                        send_data(conn, {})
+
+            elif request[0] == "SAVE_DATA":
+                file_name = request[1]
+                file_payload = request[2]
+                
+                with file_lock: # <--- LOCK THE FILE
+                    with open(file_name, "w") as f:
+                        json.dump(file_payload, f, indent=4)
+                        
+                send_data(conn, "SAVED")
+            # ==================================================
+
+            # --- CHANGE THIS FROM 'if' TO 'elif' ---
+            elif request[0] == "GET":
                 summary = {id: len([p for p in info["players"] if p is not None]) for id, info in lobbies.items()}
                 send_data(conn, summary)
 
